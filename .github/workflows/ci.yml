@@ -60,7 +60,7 @@ jobs:
 
       # 生成器漂移检查：仓库里的示例必须与 CLI 当前产出完全一致。
       # 改了生成器却忘记重新生成示例，这一步会红。
-      - name: CLI: generated skeleton matches committed example
+      - name: "CLI: generated skeleton matches committed example"
         run: |
           moon run cmd/main -- x-counter > /tmp/generated-component.mbt
           diff -u examples/generated-x-counter/component.mbt /tmp/generated-component.mbt
