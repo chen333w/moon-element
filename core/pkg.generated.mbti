@@ -8,6 +8,8 @@ import {
 // Values
 pub fn camel_to_kebab(String) -> String
 
+pub fn escape_text(String) -> String
+
 pub fn kebab_to_camel(String) -> String
 
 pub fn observed_attributes(Array[AttrSpec]) -> Array[String]
@@ -15,6 +17,10 @@ pub fn observed_attributes(Array[AttrSpec]) -> Array[String]
 pub fn parse_double(String) -> Double?
 
 pub fn parse_int(String) -> Int32?
+
+pub fn render(View) -> String
+
+pub fn scope_css(String, String) -> String
 
 // Errors
 
@@ -82,6 +88,19 @@ pub(all) enum Reaction {
   ReactAdopted
 } derive(@debug.Debug)
 pub fn Reaction::to_repr(Self) -> @debug.Repr
+
+pub(all) enum View {
+  VText(String)
+  VRaw(String)
+  VElement(String, Array[(String, String)], Array[View])
+  VFragment(Array[View])
+  VNothing
+}
+pub fn View::element(String, Array[(String, String)], Array[Self]) -> Self
+pub fn View::fragment(Array[Self]) -> Self
+pub fn View::nothing() -> Self
+pub fn View::raw(String) -> Self
+pub fn View::text(String) -> Self
 
 // Type aliases
 
