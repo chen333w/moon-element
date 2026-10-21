@@ -1,5 +1,6 @@
-// import {
-//   "chen333w/moon-element" @lib,
-// }
+import {
+  "chen333w/moon-element/core",
+  "moonbitlang/core/argparse",
+}
 
 pkgtype(kind: "executable")

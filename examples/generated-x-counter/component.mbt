@@ -1,0 +1,29 @@
+// 由 moon-element CLI 生成的自定义元素骨架：x-counter
+//
+// 使用方式：
+// 1) 在本包的 moon.pkg 里声明依赖（import 属于包配置，不能写进 .mbt）：
+//      import {
+//        "chen333w/moon-element/core" @core,
+//        "chen333w/moon-element/dom" @dom,
+//      }
+// 2) 把本文件放进包里，并在入口处调用 register_x_counter()
+// 3) 产物是标准自定义元素：宿主页面里写 <x-counter> 即可，渲染结果在 shadow root 内
+
+///|
+fn render_x_counter(props : @core.Props) -> @core.View {
+  let label = props.get_string("label").unwrap_or("")
+  @core.View::element("span", [], [@core.View::text(label)])
+}
+
+///|
+pub fn register_x_counter() -> Unit {
+  @dom.define_component(
+    "x-counter",
+    [@core.AttrSpec::string("label", "")],
+    render_x_counter,
+    events=[
+      // 需要让宿主页面收到的事件，用 crossing（bubbles + composed）
+      @core.EventSpec::crossing("x-counter-changed"),
+    ],
+  )
+}

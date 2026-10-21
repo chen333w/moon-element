@@ -8,7 +8,11 @@ import {
 // Values
 pub fn camel_to_kebab(String) -> String
 
+pub fn component_skeleton(String) -> String?
+
 pub fn escape_text(String) -> String
+
+pub fn is_valid_event_name(String) -> Bool
 
 pub fn kebab_to_camel(String) -> String
 
@@ -21,6 +25,10 @@ pub fn parse_int(String) -> Int32?
 pub fn render(View) -> String
 
 pub fn scope_css(String, String) -> String
+
+pub fn tag_to_snake(String) -> String
+
+pub fn validate_tag_name(String) -> Bool
 
 // Errors
 
@@ -57,6 +65,27 @@ pub fn AttrValue::equal(Self, Self) -> Bool
 pub fn AttrValue::not_equal(Self, Self) -> Bool
 pub fn AttrValue::to_attr(Self) -> String?
 pub fn AttrValue::to_repr(Self) -> @debug.Repr
+
+pub struct EventRegistry {
+  specs : Array[EventSpec]
+}
+pub fn EventRegistry::add(Self, EventSpec) -> Bool
+pub fn EventRegistry::find(Self, String) -> EventSpec?
+pub fn EventRegistry::length(Self) -> Int32
+pub fn EventRegistry::names(Self) -> Array[String]
+pub fn EventRegistry::new() -> Self
+
+pub struct EventSpec {
+  name : String
+  bubbles : Bool
+  composed : Bool
+}
+pub fn EventSpec::bubbles(Self) -> Bool
+pub fn EventSpec::composed(Self) -> Bool
+pub fn EventSpec::contained(String) -> Self
+pub fn EventSpec::crossing(String) -> Self
+pub fn EventSpec::name(Self) -> String
+pub fn EventSpec::new(String, Bool, Bool) -> Self
 
 pub struct Lifecycle {
   mut state : LifecycleState

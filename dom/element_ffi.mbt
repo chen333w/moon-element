@@ -37,6 +37,37 @@ pub extern "js" fn install_dom_stub() -> Unit =
   #|        return globalThis.__moon_element_registry[name];
   #|      },
   #|    };
+  #|    // 事件相关的三个东西：CustomEvent、addEventListener、dispatchEvent。
+  #|    // 只实现适配层与测试需要的最小子集（同步派发、不实现捕获/冒泡路径传播）。
+  #|    globalThis.CustomEvent = class CustomEvent {
+  #|      constructor(type, init) {
+  #|        this.type = type;
+  #|        this.detail = init && init.detail;
+  #|        this.bubbles = !!(init && init.bubbles);
+  #|        this.composed = !!(init && init.composed);
+  #|        this.cancelable = !!(init && init.cancelable);
+  #|        this.defaultPrevented = false;
+  #|      }
+  #|      preventDefault() {
+  #|        if (this.cancelable) {
+  #|          this.defaultPrevented = true;
+  #|        }
+  #|      }
+  #|    };
+  #|    globalThis.HTMLElement.prototype.addEventListener = function (type, fn) {
+  #|      if (!this.__listeners) {
+  #|        this.__listeners = Object.create(null);
+  #|      }
+  #|      (this.__listeners[type] || (this.__listeners[type] = [])).push(fn);
+  #|    };
+  #|    globalThis.HTMLElement.prototype.dispatchEvent = function (ev) {
+  #|      const list = (this.__listeners && this.__listeners[ev.type]) || [];
+  #|      for (const fn of list) {
+  #|        fn(ev);
+  #|      }
+  #|      // 浏览器语义：返回 false 表示有监听者取消了默认行为
+  #|      return !ev.defaultPrevented;
+  #|    };
   #|  }
   #|}
 

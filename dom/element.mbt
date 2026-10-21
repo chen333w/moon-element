@@ -13,6 +13,9 @@ priv struct Instance {
   props : @core.Props
   lifecycle : @core.Lifecycle
   render_fn : (@core.Props) -> @core.View
+  event_registry : @core.EventRegistry
+  // 派发过的事件记录（诊断与测试用）："name:detail:canceled"
+  event_log : Array[String]
 }
 
 ///|
@@ -46,14 +49,21 @@ fn ensure_instance(
   id : Int32,
   specs : Array[@core.AttrSpec],
   render_fn : (@core.Props) -> @core.View,
+  events : Array[@core.EventSpec],
 ) -> Instance {
   match instance_get(id) {
     Some(inst) => inst
     None => {
+      let event_registry = @core.EventRegistry::new()
+      for spec in events {
+        let _ = event_registry.add(spec)
+      }
       let inst : Instance = {
         props: @core.Props::new(specs),
         lifecycle: @core.Lifecycle::new(),
         render_fn,
+        event_registry,
+        event_log: [],
       }
       instance_put(id, inst)
       inst
@@ -80,10 +90,13 @@ fn paint(id : Int32) -> Unit {
 /// - `render_fn` 在元素连接时、以及任何被观察属性变化且元素处于连接状态时被调用；
 ///   返回的视图渲染成 HTML 写入 shadow root
 /// - 属性在连接**之前**就被设置（浏览器在升级已有元素时就是这么做的）也能正确处理
+/// - `events` 声明本组件会派发的事件（名字会被校验、重名会被拒），
+///   派发时按声明决定 bubbles / composed；未声明的事件仍可派发，但用保守默认值
 pub fn define_component(
   tag : String,
   specs : Array[@core.AttrSpec],
   render_fn : (@core.Props) -> @core.View,
+  events~ : Array[@core.EventSpec] = [],
 ) -> Unit {
   // FixedArray 是定长数组（没有 push），先分配再按下标写入
   let observed : FixedArray[String] = FixedArray::make(specs.length(), "")
@@ -93,7 +106,7 @@ pub fn define_component(
     oi = oi + 1
   }
   let on_connected : (Int32) -> Unit = fn(id) {
-    let inst = ensure_instance(id, specs, render_fn)
+    let inst = ensure_instance(id, specs, render_fn, events)
     if inst.lifecycle.on_connect() {
       instance_put(id, inst)
       paint(id)
@@ -115,7 +128,7 @@ pub fn define_component(
     has_new,
     new_value,
   ) {
-    let inst = ensure_instance(id, specs, render_fn)
+    let inst = ensure_instance(id, specs, render_fn, events)
     let old_opt : String? = if had_old { Some(old_value) } else { None }
     let new_opt : String? = if has_new { Some(new_value) } else { None }
     inst.lifecycle.on_attribute_changed(name, old_opt, new_opt)

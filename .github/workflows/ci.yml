@@ -58,7 +58,14 @@ jobs:
       - name: Test all backends
         run: moon test --target all --deny-warn
 
-      # 覆盖率目前只作参考（当前可插桩代码极少，真实数字随 core/ 落地增长）。
+      # 生成器漂移检查：仓库里的示例必须与 CLI 当前产出完全一致。
+      # 改了生成器却忘记重新生成示例，这一步会红。
+      - name: CLI: generated skeleton matches committed example
+        run: |
+          moon run cmd/main -- x-counter > /tmp/generated-component.mbt
+          diff -u examples/generated-x-counter/component.mbt /tmp/generated-component.mbt
+
+      # 覆盖率目前只作参考（CLI 入口与示例的运行路径不在单元测试覆盖范围内）。
       - name: Coverage (js, informational)
         run: |
           moon test --target js --enable-coverage
