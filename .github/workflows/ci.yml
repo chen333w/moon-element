@@ -1,0 +1,65 @@
+# MoonBit 项目的 CI 门禁。
+# 结构参照官方 starter 模板（moonbit-community/starter）的 check.yml，
+# 动作版本固定到 commit SHA，避免上游 tag 漂移。
+name: ci
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  check:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    defaults:
+      run:
+        shell: bash
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+
+      # js 后端的测试需要一个 JS 运行时。
+      - uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7.1.0
+        with:
+          node-version: '24'
+          package-manager-cache: false
+
+      - name: Install MoonBit
+        run: |
+          curl -fsSL https://cli.moonbitlang.com/install/unix.sh | bash
+          echo "$HOME/.moon/bin" >> "$GITHUB_PATH"
+
+      - name: Toolchain version
+        run: moon version --all
+
+      - name: Check formatting
+        run: moon fmt --check
+
+      - name: Check all backends
+        run: moon check --target all --deny-warn
+
+      # 公开接口（.mbti）必须与源码一致且已提交，防止接口悄悄漂移。
+      - name: Check public interfaces
+        run: |
+          moon info --target all
+          git diff --exit-code
+          test -z "$(git ls-files --others --exclude-standard -- '*.mbti')"
+
+      - name: Test all backends
+        run: moon test --target all --deny-warn
+
+      # 覆盖率目前只作参考（当前可插桩代码极少，真实数字随 core/ 落地增长）。
+      - name: Coverage (js, informational)
+        run: |
+          moon test --target js --enable-coverage
+          moon coverage report -f summary
