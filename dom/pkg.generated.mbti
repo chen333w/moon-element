@@ -1,0 +1,23 @@
+// Generated using `moon info`, DON'T EDIT IT
+package "chen333w/moon-element/dom"
+
+// Values
+pub fn define_element(String, () -> Unit) -> Unit
+
+pub fn fire_connected(String) -> Unit
+
+pub fn install_dom_stub() -> Unit
+
+pub fn is_registered_element(String) -> Bool
+
+pub fn js_mark() -> Unit
+
+pub fn js_mark_count() -> Int32
+
+// Errors
+
+// Types and methods
+
+// Type aliases
+
+// Traits
