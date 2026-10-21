@@ -1,0 +1,88 @@
+// Generated using `moon info`, DON'T EDIT IT
+package "chen333w/moon-element/core"
+
+import {
+  "moonbitlang/core/debug",
+}
+
+// Values
+pub fn camel_to_kebab(String) -> String
+
+pub fn kebab_to_camel(String) -> String
+
+pub fn observed_attributes(Array[AttrSpec]) -> Array[String]
+
+pub fn parse_double(String) -> Double?
+
+pub fn parse_int(String) -> Int32?
+
+// Errors
+
+// Types and methods
+pub(all) enum AttrKind {
+  AttrString
+  AttrInt
+  AttrDouble
+  AttrBool
+}
+
+pub struct AttrSpec {
+  attr_name : String
+  kind : AttrKind
+  default : AttrValue
+}
+pub fn AttrSpec::bool(String, Bool) -> Self
+pub fn AttrSpec::double(String, Double) -> Self
+pub fn AttrSpec::int(String, Int32) -> Self
+pub fn AttrSpec::parse(Self, String?) -> AttrValue
+pub fn AttrSpec::prop_name(Self) -> String
+pub fn AttrSpec::string(String, String) -> Self
+
+pub(all) enum AttrValue {
+  VString(String)
+  VInt(Int32)
+  VDouble(Double)
+  VBool(Bool)
+} derive(Eq, @debug.Debug)
+pub fn AttrValue::equal(Self, Self) -> Bool
+pub fn AttrValue::not_equal(Self, Self) -> Bool
+pub fn AttrValue::to_attr(Self) -> String?
+pub fn AttrValue::to_repr(Self) -> @debug.Repr
+
+pub struct Lifecycle {
+  mut state : LifecycleState
+  mut connect_count : Int32
+  mut disconnect_count : Int32
+  reactions : Array[Reaction]
+}
+pub fn Lifecycle::connect_count(Self) -> Int32
+pub fn Lifecycle::disconnect_count(Self) -> Int32
+pub fn Lifecycle::is_connected(Self) -> Bool
+pub fn Lifecycle::new() -> Self
+pub fn Lifecycle::on_adopted(Self) -> Unit
+pub fn Lifecycle::on_attribute_changed(Self, String, String?, String?) -> Unit
+pub fn Lifecycle::on_connect(Self) -> Bool
+pub fn Lifecycle::on_disconnect(Self) -> Bool
+pub fn Lifecycle::reaction_count(Self) -> Int32
+pub fn Lifecycle::reaction_log(Self) -> Array[String]
+pub fn Lifecycle::state(Self) -> LifecycleState
+
+pub(all) enum LifecycleState {
+  Unconnected
+  Connected
+} derive(Eq, @debug.Debug)
+pub fn LifecycleState::equal(Self, Self) -> Bool
+pub fn LifecycleState::not_equal(Self, Self) -> Bool
+pub fn LifecycleState::to_repr(Self) -> @debug.Repr
+
+pub(all) enum Reaction {
+  ReactConnected
+  ReactDisconnected
+  ReactAttributeChanged(String, String?, String?)
+  ReactAdopted
+} derive(@debug.Debug)
+pub fn Reaction::to_repr(Self) -> @debug.Repr
+
+// Type aliases
+
+// Traits
