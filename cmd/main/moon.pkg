@@ -1,0 +1,5 @@
+// import {
+//   "chen333w/moon-element" @lib,
+// }
+
+pkgtype(kind: "executable")
