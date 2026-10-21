@@ -74,7 +74,8 @@ test "parse_double: 合法输入" {
 test "parse_double: 非法输入一律 None" {
   for
     bad in [
-      "", "-", "+", ".", "5.", "1e3", "0x10", "abc", "1.2.3", "1.1234567890",
+      "", "-", "+", ".", "5.", "1e3", "0x10", "abc", "1.2.3", "1.1234567890", "1000000000",
+      "9.9999999999",
     ] {
     assert_eq(@core.parse_double(bad), None)
   }
@@ -142,8 +143,20 @@ test "AttrSpec: 布尔按「存在即真」解析" {
 test "AttrValue::to_attr: 布尔假用「移除属性」表达" {
   assert_eq(@core.VString("x").to_attr(), Some("x"))
   assert_eq(@core.VInt(5).to_attr(), Some("5"))
+  assert_eq(@core.VDouble(2.5).to_attr(), Some("2.5"))
   assert_eq(@core.VBool(true).to_attr(), Some(""))
   assert_eq(@core.VBool(false).to_attr(), None)
+}
+
+///|
+test "kebab_to_camel: 短横线后的非小写字母不被改动" {
+  // 已是大写：不重复大写
+  assert_eq(@core.kebab_to_camel("-A"), "A")
+  assert_eq(@core.kebab_to_camel("x-A"), "xA")
+  // 不是字母：原样保留，并且会「消耗掉」这一次大写动作
+  assert_eq(@core.kebab_to_camel("-1"), "1")
+  assert_eq(@core.kebab_to_camel("x-_y"), "x_y")
+  assert_eq(@core.kebab_to_camel("x-_Y"), "x_Y")
 }
 
 ///|
