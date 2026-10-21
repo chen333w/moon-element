@@ -37,9 +37,12 @@ pub struct AttrSpec {
   kind : AttrKind
   default : AttrValue
 }
+pub fn AttrSpec::attr_name(Self) -> String
 pub fn AttrSpec::bool(String, Bool) -> Self
+pub fn AttrSpec::default_value(Self) -> AttrValue
 pub fn AttrSpec::double(String, Double) -> Self
 pub fn AttrSpec::int(String, Int32) -> Self
+pub fn AttrSpec::kind(Self) -> AttrKind
 pub fn AttrSpec::parse(Self, String?) -> AttrValue
 pub fn AttrSpec::prop_name(Self) -> String
 pub fn AttrSpec::string(String, String) -> Self
@@ -80,6 +83,19 @@ pub(all) enum LifecycleState {
 pub fn LifecycleState::equal(Self, Self) -> Bool
 pub fn LifecycleState::not_equal(Self, Self) -> Bool
 pub fn LifecycleState::to_repr(Self) -> @debug.Repr
+
+pub struct Props {
+  specs : Array[AttrSpec]
+  values : Array[AttrValue]
+}
+pub fn Props::apply(Self, String, String?) -> Bool
+pub fn Props::get(Self, String) -> AttrValue?
+pub fn Props::get_bool(Self, String) -> Bool?
+pub fn Props::get_double(Self, String) -> Double?
+pub fn Props::get_int(Self, String) -> Int32?
+pub fn Props::get_string(Self, String) -> String?
+pub fn Props::keys(Self) -> Array[String]
+pub fn Props::new(Array[AttrSpec]) -> Self
 
 pub(all) enum Reaction {
   ReactConnected

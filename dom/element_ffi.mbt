@@ -19,6 +19,16 @@ pub extern "js" fn install_dom_stub() -> Unit =
   #|  if (typeof globalThis.customElements === "undefined") {
   #|    globalThis.__moon_element_registry = Object.create(null);
   #|    globalThis.HTMLElement = class HTMLElement {};
+  #|    // 真实的 HTMLElement 有 attachShadow；stub 也要有，否则适配层的
+  #|    // shadow DOM 路径在无浏览器环境下无法测试。
+  #|    globalThis.HTMLElement.prototype.attachShadow = function (opts) {
+  #|      this.shadowRoot = {
+  #|        innerHTML: "",
+  #|        host: this,
+  #|        mode: (opts && opts.mode) || "open",
+  #|      };
+  #|      return this.shadowRoot;
+  #|    };
   #|    globalThis.customElements = {
   #|      define(name, ctor) {
   #|        globalThis.__moon_element_registry[name] = ctor;

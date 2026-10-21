@@ -72,6 +72,21 @@ pub fn AttrSpec::prop_name(self : AttrSpec) -> String {
 }
 
 ///|
+pub fn AttrSpec::attr_name(self : AttrSpec) -> String {
+  self.attr_name
+}
+
+///|
+pub fn AttrSpec::kind(self : AttrSpec) -> AttrKind {
+  self.kind
+}
+
+///|
+pub fn AttrSpec::default_value(self : AttrSpec) -> AttrValue {
+  self.default
+}
+
+///|
 /// 解析属性的原始值。
 ///
 /// - `None`（属性不存在或已被移除）→ 默认值
