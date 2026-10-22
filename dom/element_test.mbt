@@ -128,3 +128,30 @@ test "adapter: 两个实例互不干扰" {
   assert_eq(@dom.instance_prop_string(a, "label"), Some("A"))
   assert_eq(@dom.instance_prop_string(b, "label"), Some("B"))
 }
+
+///|
+test "adapter: on_change 在状态更新后触发，可用于派发对外事件" {
+  @dom.install_dom_stub()
+  let seen : Array[String] = []
+  @dom.define_component(
+    "x-change-probe",
+    specs(),
+    render_badge,
+    events=[@core.EventSpec::crossing("changed")],
+    on_change=fn(id, name) {
+      seen.push(name)
+      // 这是事件系统预期的用法：组件自己不需要知道实例 id
+      let _ = @dom.dispatch(id, "changed", name, false)
+    },
+  )
+  let id = @dom.probe_create("x-change-probe")
+  @dom.probe_connect(id)
+  @dom.probe_set_attribute(id, "label", "x")
+  @dom.probe_set_attribute(id, "max-count", "5")
+  assert_eq(seen, ["label", "max-count"])
+  assert_eq(@dom.instance_event_log(id), [
+    "changed|label|canceled=false", "changed|max-count|canceled=false",
+  ])
+  // 回调在渲染之后：此时读到的 DOM 已经是新值
+  assert_eq(@dom.probe_shadow_html(id), "<span class=\"badge\">x:5</span>")
+}

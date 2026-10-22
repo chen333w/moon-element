@@ -57,29 +57,46 @@ Error: [4014] Expr Type Mismatch
 
 ## 假设 3：MoonBit 产出的 JS 可被外部加载
 
-**做法**：构建 js 产物并在 node 中运行入口；检查产物形态。
+**做法**：构建 demo 的 js 产物，**直接 import 那个文件**（浏览器会加载的同一份），在 node 的最小 DOM 桩上断言真实行为。
 
-**命令与真实输出**：
+**命令与真实输出**（2026-10-22 补测完成）：
 
 ```bash
-$ moon build --target js
+$ moon build --target js --release
 Finished. moon: ran 2 tasks, now up to date
 
-$ moon run cmd/main --target js
-Hello
+$ node examples/demo/verify.mjs
+moon-element demo 无头验证
+产物: .../_build/js/release/build/examples/demo/demo.js
+[moon-element] demo 组件已注册：x-counter / x-badge / x-card
+  ok   构建产物可以被 ES 模块方式加载并执行
+  ok   加载后三个自定义元素都已注册
+  ok   observedAttributes 由属性规格生成
+  ok   默认值生效（count=0, max=10）
+  ok   合法属性被采用并重渲染
+  ok   组件通过 crossing 事件通知页面（bubbles+composed）
+  ok   进度条宽度按 count/max 计算
+  ok   非法属性值回退默认值而不是报错
+  ok   用户输入被转义，不会被当成标签执行
+  ok   卡片渲染标题与正文
+  ok   卡片正文同样走转义
 
-$ find _build -name "*.js" | head
-_build/js/debug/build/cmd/main/main.js
+通过 11，失败 0
 ```
 
-**结论：🟡 部分验证。** 产物存在于 `_build/js/debug/build/cmd/main/main.js`，node 可直接运行。**但**「浏览器 `<script type="module">` 直接加载」这一条尚未验证：默认产物是普通（非 ESM）脚本，需要在可执行包上配置 `link: { "js": { "format": "esm" } }` 并生成 demo 页后复验。
+**结论：✅ 成立。** 产物能被 ES 模块方式加载并执行，组件注册与运行时行为全部符合预期。该验证已接入 CI（`Build demo (js) and verify the artifact headlessly`）。
 
-后续动作：在做 demo 页那一步补齐 `format = "esm"` 的真实产物验证；若受阻，用 IIFE 产物 + 一段薄加载脚本兜底（不影响选题成立）。
+### 附带实测结论：`link.js.format` 对可执行包是 no-op
+
+上一轮我写的「需要配置 `format: "esm"`」是**错的**：实测加上与不加上该选项，产物**逐字节相同**——可执行包的 js 产物既无 `export` 也无 `require`，是一段普通脚本（末尾自带自执行初始化）。该选项只在需要对外导出符号时才有意义。
+
+这也解释了为什么浏览器能用：`<script type="module" src="...">` 对「无导出的脚本」同样有效，模块脚本并不要求必须有导出。所以 `examples/demo/moon.pkg` 里**故意不写**这个选项，以免误导。
 
 ---
 
 ## 附：本阶段的工程约定（后续沿用）
 
 - 纯逻辑放 target-agnostic 包，js 相关的 FFI 集中在 `supported_targets = "js"` 的 `dom/` 包，避免污染全后端构建。
-- 测试用无依赖的 `install_dom_stub()` 在 node 下跑通，不引入 jsdom/happy-dom 这类 npm 依赖；真实浏览器行为另用 demo 页验证。
+- 测试用无依赖的 `install_dom_stub()` 在 node 下跑通，不引入 jsdom/happy-dom 这类 npm 依赖；构建产物的真实行为由 `examples/demo/verify.mjs` 验证。
 - 每次改动跑 `moon check --deny-warn --target all`，警告视为错误。
+- 改过 `.github/workflows/*.yml` 必须本地校验 YAML：`ruby -ryaml -e 'YAML.load_file("...")'`（曾因步骤名里的 `": "` 把整个 workflow 打崩）。

@@ -1,0 +1,149 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>moon-element demo · MoonBit 标准 Web Components</title>
+<style>
+  /* 页面自己的样式。故意写得"霸道"一点：下面这些选择器如果泄漏进组件内部，
+     组件的样子就会被页面污染——组件用 shadow DOM 隔离，所以不受影响。 */
+  body { font: 15px/1.6 system-ui, -apple-system, "Helvetica Neue", sans-serif;
+         margin: 0; padding: 32px; color: #1c2330; background: #f6f8fb; }
+  h1 { font-size: 22px; margin: 0 0 6px; }
+  .sub { color: #5b6472; margin-bottom: 24px; }
+  section { background: #fff; border: 1px solid #e3e8ef; border-radius: 14px;
+            padding: 18px 20px; margin-bottom: 18px; }
+  h2 { font-size: 15px; margin: 0 0 12px; color: #3b4453; }
+  .row { display: flex; gap: 14px; align-items: center; flex-wrap: wrap; }
+  button { font: inherit; padding: 6px 12px; border-radius: 8px; cursor: pointer;
+           border: 1px solid #cfd8e3; background: #fff; }
+  button:hover { background: #f1f5f9; }
+  input, select { font: inherit; padding: 6px 8px; border-radius: 8px; border: 1px solid #cfd8e3; }
+  code { background: #eef2f7; padding: 1px 5px; border-radius: 5px; font-size: 13px; }
+  .note { color: #5b6472; font-size: 13px; margin: 10px 0 0; }
+  #log { font: 12px/1.7 ui-monospace, SFMono-Regular, Menlo, monospace; background: #0f172a;
+         color: #cbd5e1; border-radius: 10px; padding: 12px; min-height: 92px; white-space: pre-wrap; }
+  .err { background: #ffe9e9; border: 1px solid #ffc9c9; color: #8f1d1d; padding: 12px;
+         border-radius: 10px; margin-bottom: 16px; }
+  /* 这个规则只该影响页面里的 .pill，不该影响组件内部的 .pill */
+  .pill { background: hotpink !important; color: #fff !important; padding: 6px 10px;
+          border-radius: 999px; font-size: 13px; }
+  span { letter-spacing: .3em; }
+</style>
+</head>
+<body>
+  <h1>moon-element</h1>
+  <div class="sub">用 MoonBit 写的标准 Web Components —— 组件按标准自定义元素注册，可嵌进任意页面或框架。</div>
+
+  <div id="boot-error" class="err" hidden></div>
+
+  <section>
+    <h2>1 · 属性驱动 + 组件对外派发事件</h2>
+    <div class="row">
+      <x-counter id="counter" count="3" max="10" label="已处理任务"></x-counter>
+      <div class="row">
+        <button id="dec">−1</button>
+        <button id="inc">+1</button>
+        <button id="set-bad">设一个非法值 <code>count="abc"</code></button>
+      </div>
+    </div>
+    <p class="note">
+      按钮只是改属性：<code>el.setAttribute("count", n)</code>。组件重渲染后，
+      通过声明为 <code>crossing</code>（bubbles + composed）的事件通知页面；
+      非法值不会报错，而是**回退到默认值**。
+    </p>
+    <div id="log"></div>
+  </section>
+
+  <section>
+    <h2>2 · shadow DOM 样式隔离</h2>
+    <div class="row">
+      <x-badge id="badge" label="受组件样式控制" tone="info"></x-badge>
+      <span class="pill">页面里的 .pill（被页面样式染成粉色）</span>
+    </div>
+    <p class="note">
+      页面给 <code>.pill</code> 和 <code>span</code> 定了很霸道的样式，但组件内部的
+      <code>.pill</code> 完全不受影响 —— shadow DOM 把样式挡住了。
+    </p>
+  </section>
+
+  <section>
+    <h2>3 · HTML 转义</h2>
+    <div class="row">
+      <x-badge id="escape-demo" label="正常文本" tone="plain"></x-badge>
+      <button id="inject-html">把 label 设成 <code>&lt;b&gt;加粗&lt;/b&gt;</code></button>
+    </div>
+    <p class="note">
+      设成 HTML 后看到的仍然是**字面文本**：组件默认走转义路径，不会把用户输入当标签执行。
+    </p>
+  </section>
+
+  <section>
+    <h2>4 · 组合与实时更新</h2>
+    <div class="row">
+      <x-card id="card" title="发布说明" body="在下方输入框里改内容，卡片会实时更新。" tone="info"></x-card>
+      <div>
+        <input id="card-body" size="30" value="在下方输入框里改内容，卡片会实时更新。" />
+        <select id="card-tone">
+          <option value="info">tone=info</option>
+          <option value="warn">tone=warn</option>
+        </select>
+      </div>
+    </div>
+  </section>
+
+  <script type="module">
+    const logEl = document.getElementById("log");
+    let seq = 0;
+    function log(line) {
+      seq += 1;
+      logEl.textContent = `#${seq}  ${line}\n` + logEl.textContent;
+    }
+
+    try {
+      // 构建产物：在仓库根目录执行 `moon build --target js --release` 后生成
+      await import("../../_build/js/release/build/examples/demo/demo.js");
+    } catch (e) {
+      const box = document.getElementById("boot-error");
+      box.hidden = false;
+      box.textContent =
+        "加载组件失败：" + e.message +
+        " —— 请先在仓库根目录运行 `moon build --target js --release`，再通过 HTTP 服务打开本页" +
+        "（ES 模块不能用 file:// 直接打开，可用 `python3 -m http.server 8000`）。";
+      throw e;
+    }
+
+    const counter = document.getElementById("counter");
+    counter.addEventListener("count-changed", () => {
+      log(`收到 count-changed（跨 shadow 边界）= ${counter.getAttribute("count")}`);
+    });
+    document.getElementById("inc").onclick = () => {
+      const n = Number(counter.getAttribute("count") || "0");
+      counter.setAttribute("count", String(n + 1));
+    };
+    document.getElementById("dec").onclick = () => {
+      const n = Number(counter.getAttribute("count") || "0");
+      counter.setAttribute("count", String(n - 1));
+    };
+    document.getElementById("set-bad").onclick = () => {
+      counter.setAttribute("count", "abc");
+      log("把 count 设成 abc —— 组件回退到默认值 0");
+    };
+
+    const badge = document.getElementById("badge");
+    badge.addEventListener("badge-changed", () => log("收到 badge-changed"));
+
+    const escapeDemo = document.getElementById("escape-demo");
+    document.getElementById("inject-html").onclick = () => {
+      escapeDemo.setAttribute("label", "<b>加粗</b>");
+      log("label 已设为 <b>加粗</b>，组件渲染的是字面文本");
+    };
+
+    const card = document.getElementById("card");
+    document.getElementById("card-body").oninput = (e) => card.setAttribute("body", e.target.value);
+    document.getElementById("card-tone").onchange = (e) => card.setAttribute("tone", e.target.value);
+
+    log("3 个组件已注册，事件监听已挂上");
+  </script>
+</body>
+</html>

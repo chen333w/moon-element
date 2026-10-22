@@ -6,7 +6,7 @@ import {
 }
 
 // Values
-pub fn define_component(String, Array[@core.AttrSpec], (@core.Props) -> @core.View, events? : Array[@core.EventSpec]) -> Unit
+pub fn define_component(String, Array[@core.AttrSpec], (@core.Props) -> @core.View, events? : Array[@core.EventSpec], on_change? : (Int32, String) -> Unit) -> Unit
 
 pub fn define_element(String, () -> Unit) -> Unit
 

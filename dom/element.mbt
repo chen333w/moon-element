@@ -92,11 +92,15 @@ fn paint(id : Int32) -> Unit {
 /// - 属性在连接**之前**就被设置（浏览器在升级已有元素时就是这么做的）也能正确处理
 /// - `events` 声明本组件会派发的事件（名字会被校验、重名会被拒），
 ///   派发时按声明决定 bubbles / composed；未声明的事件仍可派发，但用保守默认值
+/// - `on_change` 在每次被观察属性变化、且状态更新完毕（含重渲染）之后被调用，
+///   参数是 (实例 id, 属性名)。这是组件对外派发事件的入口：在回调里调用 `dispatch`，
+///   避免让用户自己去猜实例 id
 pub fn define_component(
   tag : String,
   specs : Array[@core.AttrSpec],
   render_fn : (@core.Props) -> @core.View,
   events~ : Array[@core.EventSpec] = [],
+  on_change~ : (Int32, String) -> Unit = fn(_id, _name) { () },
 ) -> Unit {
   // FixedArray 是定长数组（没有 push），先分配再按下标写入
   let observed : FixedArray[String] = FixedArray::make(specs.length(), "")
@@ -138,6 +142,8 @@ pub fn define_component(
     if inst.lifecycle.is_connected() {
       paint(id)
     }
+    // 状态与 DOM 都更新完了再通知调用方，这样回调里读到的是一致的状态
+    on_change(id, name)
   }
   js_define(tag, observed, on_connected, on_disconnected, on_attribute)
 }

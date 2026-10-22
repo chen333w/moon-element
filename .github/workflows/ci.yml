@@ -65,6 +65,12 @@ jobs:
           moon run cmd/main -- x-counter > /tmp/generated-component.mbt
           diff -u examples/generated-x-counter/component.mbt /tmp/generated-component.mbt
 
+      # 构建 demo 产物并在 node 里验证它真的能跑（D0 假设 3 的持续验证）。
+      - name: Build demo and verify the artifact headlessly
+        run: |
+          moon build --target js --release
+          node examples/demo/verify.mjs
+
       # 覆盖率目前只作参考（CLI 入口与示例的运行路径不在单元测试覆盖范围内）。
       - name: Coverage (js, informational)
         run: |
