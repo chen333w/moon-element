@@ -22,9 +22,8 @@ pub fn Props::new(specs : Array[AttrSpec]) -> Props {
 ///|
 /// 应用一次属性变化：`None` 表示属性被移除 → 回退默认值。
 ///
-/// 返回 `false` 表示这个属性名不在规格里（未被观察）；此时取值不变。
-/// 注意：调用方**不应**把 `false` 当作错误——真实浏览器只会回调被观察的属性，
-/// 这个返回值主要用于防御性检查与调试。
+/// 返回 `false` 表示属性名不在规格里（未被观察），此时取值不变。浏览器只会回调
+/// 被观察的属性，该返回值用于防御性检查与调试。
 pub fn Props::apply(self : Props, attr_name : String, raw : String?) -> Bool {
   let mut i = 0
   while i < self.specs.length() {

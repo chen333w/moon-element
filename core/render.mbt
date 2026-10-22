@@ -1,8 +1,8 @@
 ///|
 /// 视图树。
 ///
-/// 刻意的极简模型：只表达「元素 + 属性 + 子节点 + 文本 + 片段」。渲染是纯函数，
-/// 因此可以在四个后端上用普通单元测试验证；真正的 DOM 挂载由适配层负责。
+/// 只表达「元素 + 属性 + 子节点 + 文本 + 片段」。渲染是纯函数，
+/// 可以在四个后端上用普通单元测试验证；DOM 挂载由适配层负责。
 ///
 /// - `VText` 会被 HTML 转义；`VRaw` 不会，调用方自己负责安全
 /// - `VElement` 是 (标签名, 属性列表, 子节点)
@@ -20,7 +20,7 @@ pub fn View::text(s : String) -> View {
 }
 
 ///|
-/// 原样输出，**不转义**。只有在内容由你完全控制时才使用。
+/// 原样输出，**不转义**，仅在内容完全可控时使用。
 pub fn View::raw(s : String) -> View {
   VRaw(s)
 }
@@ -125,7 +125,7 @@ fn render_into(view : View, pieces : Array[String]) -> Unit {
         pieces.push("\"")
       }
       pieces.push(">")
-      // void 元素不渲染子节点（它们本来也不允许有子节点）
+      // void 元素不渲染子节点
       if !is_void_tag(tag) {
         for child in children {
           render_into(child, pieces)
@@ -141,11 +141,10 @@ fn render_into(view : View, pieces : Array[String]) -> Unit {
 ///|
 /// 把视图树渲染成 HTML 字符串。
 ///
-/// 输出是确定性的：属性按给定顺序输出，不做任何重排或去重（由调用方保证属性唯一），
-/// 因为确定性的输出才能用快照测试钉住。
+/// 输出是确定性的：属性按给定顺序输出，不做重排或去重（属性唯一由调用方保证）。
 ///
-/// 注意：这里拼字符串是 O(n²) 的朴素做法（`out = out + piece`）。当前规模下无问题，
-/// 等有真实的性能需求时再换成缓冲写入——不提前优化。
+/// 拼接字符串是 O(n²) 的朴素做法（`out = out + piece`），当前规模下无问题，
+/// 有真实性能需求时再换成缓冲写入。
 pub fn render(view : View) -> String {
   let pieces : Array[String] = []
   render_into(view, pieces)

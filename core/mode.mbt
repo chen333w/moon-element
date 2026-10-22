@@ -23,7 +23,7 @@ pub extend RenderMode with @debug.Debug::{to_repr}
 /// 解析模式名（CLI / 配置用）。
 ///
 /// 只接受 `"shadow"` 与 `"light"`，其他一律返回 `None`：不做模糊匹配，
-/// 免得把拼错的值静默当成默认值——这类错误很难在事后发现。
+/// 避免把拼错的值静默当成默认值。
 pub fn RenderMode::parse(s : String) -> RenderMode? {
   if s == "shadow" {
     Some(ShadowDom)

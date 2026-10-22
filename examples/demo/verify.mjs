@@ -1,7 +1,5 @@
-// 无头验证脚本：在 node 里加载**构建产物**，验证它真的能注册组件并正常工作。
-//
-// 这是 D0 假设 3（"MoonBit 产出的 JS 能被外部加载运行"）的实测证据：
-// 不经过 moon test，而是直接 import 浏览器会加载的那个文件。
+// 无头验证脚本：在 node 里直接 import 构建产物（浏览器加载的同一个文件），
+// 验证它真的能注册组件并正常工作。
 //
 // 用法（仓库根目录）：
 //   moon build --target js --release
@@ -12,7 +10,7 @@
 import { pathToFileURL } from "node:url";
 
 // ---------------------------------------------------------------------------
-// 最小 DOM 桩（与 dom/element_ffi.mbt 里的 install_dom_stub 等价，这里是浏览器侧的替代品）
+// 最小 DOM 桩，与 dom/element_ffi.mbt 里的 install_dom_stub 等价
 // ---------------------------------------------------------------------------
 function installDomStub() {
   if (globalThis.customElements) return;
@@ -74,9 +72,6 @@ function check(name, cond, detail) {
   }
 }
 
-// ---------------------------------------------------------------------------
-// 开始
-// ---------------------------------------------------------------------------
 const bundlePath = new URL(
   "../../_build/js/release/build/examples/demo/demo.js",
   import.meta.url,
@@ -87,7 +82,7 @@ console.log(`产物: ${bundlePath.pathname}`);
 
 installDomStub();
 
-// 关键一步：直接 import 构建产物（浏览器里就是 <script type="module" src="....js">）
+// 直接 import 构建产物（浏览器里对应 <script type="module" src="....js">）
 let importError = null;
 try {
   await import(pathToFileURL(bundlePath.pathname).href);

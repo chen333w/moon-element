@@ -7,8 +7,7 @@
 /// moon run cmd/main -- --help
 /// ```
 ///
-/// 生成逻辑在 `core/skeleton.mbt`（纯字符串逻辑、有测试覆盖），
-/// 这里只负责参数解析与打印。
+/// 生成逻辑在 `core/skeleton.mbt`，这里只负责参数解析与打印。
 
 ///|
 fn usage(cmd : @argparse.Command) -> Unit {
@@ -45,8 +44,7 @@ fn run() -> Unit {
     about="生成 MoonBit 自定义元素骨架（标准 Web Components）",
   )
   let matches = cmd.parse() catch { _ => return usage(cmd) }
-  // --mode 拼错时必须报错：静默取默认值会让生成出来的代码与预期不符，
-  // 而这类错误在事后很难发现
+  // --mode 拼错必须报错：静默取默认值会让生成出来的代码与预期不符
   let mode = if matches.values is { "mode": [raw, ..], .. } {
     match @core.RenderMode::parse(raw) {
       Some(m) => m
@@ -63,7 +61,7 @@ fn run() -> Unit {
   }
   if matches.values is { "tag": [tag, ..], .. } {
     match @core.component_skeleton(tag, mode~) {
-      // 生成内容不带尾换行（由 println 补一个）：这样写进文件后恰好一个结尾换行，
+      // 生成内容不带尾换行（由 println 补一个），写进文件后恰好一个结尾换行，
       // 与 moon fmt 规范化后的结果一致，CI 的漂移检查才有意义。
       Some(code) => println(code)
       None => {

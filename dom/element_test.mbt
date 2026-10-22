@@ -3,7 +3,6 @@
 ///
 /// 无浏览器环境（node）下用探针模拟浏览器的调用顺序：
 /// `new` → `attributeChangedCallback` → `connectedCallback` → 属性变更 → `disconnectedCallback`。
-/// 真实浏览器里的顺序与此一致（升级已有元素时，属性回调发生在连接之前）。
 
 ///|
 fn specs() -> Array[@core.AttrSpec] {
@@ -140,7 +139,6 @@ test "adapter: on_change 在状态更新后触发，可用于派发对外事件"
     events=[@core.EventSpec::crossing("changed")],
     on_change=fn(id, name) {
       seen.push(name)
-      // 这是事件系统预期的用法：组件自己不需要知道实例 id
       let _ = @dom.dispatch(id, "changed", name, false)
     },
   )
@@ -198,7 +196,7 @@ test "adapter: light 模式不建 shadow root，并用 scope_css 把样式作用
   @dom.probe_connect(id)
   // 没有 shadow root
   assert_eq(@dom.probe_shadow_html(id), "")
-  // :host 被替换为标签名，普通选择器加上标签名前缀 —— 这就是 core.scope_css 的产出
+  // :host 被替换为标签名，普通选择器加上标签名前缀
   inspect(
     @dom.probe_inner_html(id),
     content="<style>x-light-card { display: block } x-light-card p { color: red }</style><p>?</p>",

@@ -5,8 +5,8 @@
 <meta name="viewport" content="width=device-width, initial-scale=1" />
 <title>moon-element demo · MoonBit 标准 Web Components</title>
 <style>
-  /* 页面自己的样式。故意写得"霸道"一点：下面这些选择器如果泄漏进组件内部，
-     组件的样子就会被页面污染——组件用 shadow DOM 隔离，所以不受影响。 */
+  /* 页面样式。这些选择器如果泄漏进组件内部会污染组件外观；
+     组件用 shadow DOM 隔离，所以不受影响。 */
   body { font: 15px/1.6 system-ui, -apple-system, "Helvetica Neue", sans-serif;
          margin: 0; padding: 32px; color: #1c2330; background: #f6f8fb; }
   h1 { font-size: 22px; margin: 0 0 6px; }
@@ -25,10 +25,8 @@
          color: #cbd5e1; border-radius: 10px; padding: 12px; min-height: 92px; white-space: pre-wrap; }
   .err { background: #ffe9e9; border: 1px solid #ffc9c9; color: #8f1d1d; padding: 12px;
          border-radius: 10px; margin-bottom: 16px; }
-  /* 页面样式。注意这里**故意不用 !important**：
-     shadow DOM 是结构性隔离，页面规则根本进不去；
-     而 light DOM 的隔离靠选择器前缀提高优先级，压不过页面的 !important。
-     两种模式的差别就在这——第 5 节有说明。 */
+  /* 这里不用 !important：shadow DOM 是结构性隔离，页面规则进不去；
+     light DOM 的隔离靠选择器前缀提高优先级，压不过页面的 !important。 */
   .pill { background: hotpink; color: #fff; padding: 6px 10px;
           border-radius: 999px; font-size: 13px; }
   span { letter-spacing: .3em; }

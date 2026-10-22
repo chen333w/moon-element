@@ -3,9 +3,7 @@
 /// custom element 回调上（`observedAttributes` / `attributeChangedCallback` /
 /// `connectedCallback` / `disconnectedCallback`），并把渲染结果写进 shadow root。
 ///
-/// 分层原则：**所有规则都在 `core` 里**（属性解析、回退、生命周期），本文件只负责
-/// 与 DOM 的接线和实例状态管理。因此 core 的规则能在四个后端上测，
-/// 这里只需要测「接线是否接对了」。
+/// 属性解析、回退、生命周期等规则都在 `core` 里，本文件只负责与 DOM 的接线和实例状态管理。
 
 ///|
 /// 一个已注册组件的静态定义（同 tag 的所有实例共享）。
@@ -34,8 +32,8 @@ priv struct Instance {
 }
 
 ///|
-/// 实例注册表：下标即实例 id（0 号占位，id 由 JS 侧自增分配，天然连续）。
-/// 用数组而不是哈希表，是为了少一个依赖、并且让 id 与下标一一对应。
+/// 实例注册表：下标即实例 id（0 号占位，id 由 JS 侧自增分配）。
+/// 用数组而非哈希表，少一个依赖，且 id 与下标一一对应。
 let instances : Array[Instance?] = [None]
 
 ///|
@@ -49,9 +47,8 @@ fn instance_get(id : Int32) -> Instance? {
 
 ///|
 /// 写回实例状态。
-///
-/// 每次都写回，是为了**不依赖结构体的别名语义**：即使 `instance_get` 取出的是一份
-/// 拷贝，写回也能保证状态变更落到注册表里。
+/// 每次都写回，不依赖结构体的别名语义：即使 `instance_get` 取出的是拷贝，
+/// 状态变更也能落到注册表里。
 fn instance_put(id : Int32, inst : Instance) -> Unit {
   while instances.length() <= id {
     instances.push(None)
@@ -116,12 +113,11 @@ fn paint(id : Int32) -> Unit {
 /// - `specs` 决定 `observedAttributes`：只有列出的属性会触发回调
 /// - `render_fn` 在元素连接时、以及任何被观察属性变化且元素处于连接状态时被调用；
 ///   返回的视图渲染成 HTML 写入 shadow root
-/// - 属性在连接**之前**就被设置（浏览器在升级已有元素时就是这么做的）也能正确处理
+/// - 属性在连接之前就被设置（浏览器在升级已有元素时就是这么做的）也能正确处理
 /// - `events` 声明本组件会派发的事件（名字会被校验、重名会被拒），
 ///   派发时按声明决定 bubbles / composed；未声明的事件仍可派发，但用保守默认值
 /// - `on_change` 在每次被观察属性变化、且状态更新完毕（含重渲染）之后被调用，
-///   参数是 (实例 id, 属性名)。这是组件对外派发事件的入口：在回调里调用 `dispatch`，
-///   避免让用户自己去猜实例 id
+///   参数是 (实例 id, 属性名)；组件在回调里调用 `dispatch` 派发对外事件
 /// - `styles` 是组件的 CSS，只写一次：shadow 模式下原样注入（`:host` 可用），
 ///   light 模式下先用 `scope_css` 作用域到标签名再注入
 /// - `mode` 选 shadow DOM（默认）还是 light DOM；light 模式适合 SSR 输出或

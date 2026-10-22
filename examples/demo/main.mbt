@@ -1,12 +1,10 @@
 ///|
-/// demo 用的四个组件。
+/// demo 用的四个组件：属性反射（含非法值回退）、shadow DOM 样式隔离、
+/// HTML 转义、组件对外派发事件。
 ///
-/// 这里不追求功能多，而是把库的关键能力都摆到台面上：
-/// 属性反射（含非法值回退）、shadow DOM 样式隔离、HTML 转义、组件对外派发事件。
-///
-/// 数据流是单向的、便于理解的：**页面改属性 → 组件重渲染 → 组件抛事件 → 页面收到**。
-/// 组件内部不挂 DOM 监听器（渲染用 innerHTML 替换，挂内部监听器会随重渲染丢失），
-/// 所以交互按钮放在页面（light DOM）里。
+/// 数据流单向：页面改属性 → 组件重渲染 → 组件抛事件 → 页面收到。
+/// 组件内部不挂 DOM 监听器（渲染用 innerHTML 替换，内部监听器会随重渲染丢失），
+/// 交互按钮因此放在页面（light DOM）里。
 
 ///|
 const COUNTER_CSS : String =
@@ -105,13 +103,13 @@ fn card_view(props : @core.Props) -> @core.View {
 }
 
 ///|
-/// light DOM 组件的样式：**直接写在 `:host` 上、不带任何前缀**——
-/// 适配层会用 `core.scope_css` 把它改写成 `x-panel ...` 的形式，避免污染整页。
+/// light DOM 组件的样式直接写在 `:host` 上：适配层会用 `core.scope_css`
+/// 把它改写成 `x-panel ...`，避免污染整页。
 const PANEL_CSS : String =
   #|:host { display: block; margin-top: 8px; }
   #|.panel-title { font-weight: 600; color: #12457f; }
   #|.panel-body { color: #3b4453; }
-  #|/* 故意与页面里的 .pill 同名；background 与 color 都要自己定，
+  #|/* 与页面里的 .pill 同名；background 与 color 都要自己定，
   #|   否则页面的 color:#fff 会透入，变成浅底白字 */
   #|.pill { background: #eef2f7; color: #3b4453; }
 
@@ -134,8 +132,7 @@ fn panel_view(props : @core.Props) -> @core.View {
 
 ///|
 /// 注册四个组件。
-///
-/// `on_change` 里派发对外事件：组件自己不需要知道实例 id，也不需要页面去猜。
+/// `on_change` 里派发对外事件，调用方不需要知道实例 id。
 pub fn register_demo() -> Unit {
   @dom.define_component(
     "x-counter",
@@ -174,7 +171,7 @@ pub fn register_demo() -> Unit {
     card_view,
     styles=CARD_CSS,
   )
-  // 第 4 个组件：light DOM 模式，用 core.scope_css 把样式作用域到标签名
+  // light DOM 模式：用 core.scope_css 把样式作用域到标签名
   @dom.define_component(
     "x-panel",
     [
@@ -190,7 +187,7 @@ pub fn register_demo() -> Unit {
 ///|
 fn main {
   register_demo()
-  // 用 println 而不是只注册：控制台能看到一行确认，便于排查"模块到底加载了没有"
+  // 打印一行确认，便于排查模块是否加载
   println(
     "[moon-element] demo 组件已注册：x-counter / x-badge / x-card / x-panel（light DOM）",
   )

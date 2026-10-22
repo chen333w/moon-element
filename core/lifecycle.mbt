@@ -2,19 +2,18 @@
 /// 自定义元素的生命周期状态。
 ///
 /// 与 DOM 规范一致，连接状态本身是一个布尔量：元素被移出文档后回到 `Unconnected`，
-/// 与「从未连接过」不可区分。要保留痕迹得靠计数器与反应日志（本结构提供）。
+/// 与「从未连接过」不可区分；痕迹靠计数器与反应日志保留。
 pub(all) enum LifecycleState {
   Unconnected
   Connected
 } derive(Eq, @debug.Debug)
 
 ///|
-/// `derive(Eq)` 生成的方法默认会被隐式提升为普通方法（已废弃行为），
-/// 显式声明一次以保留 `==` 能力并消除该警告。
+/// 显式声明以消除派生方法被隐式提升的废弃警告。
 pub extend LifecycleState with Eq::{equal, not_equal}
 
 ///|
-/// 同上：显式声明 `Debug` 的方法，消除隐式提升的废弃警告。
+/// 显式声明以消除派生方法被隐式提升的废弃警告。
 pub extend LifecycleState with @debug.Debug::{to_repr}
 
 ///|

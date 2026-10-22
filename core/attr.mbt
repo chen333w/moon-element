@@ -2,8 +2,7 @@
 /// 属性的值类型。
 ///
 /// 对应「HTML 属性字符串 → MoonBit 值」的转换规则。布尔属性遵循 HTML 语义：
-/// **属性存在即为 true**，与属性的字面内容无关（`<x-flag>` 与 `<x-flag="">` 都是 true），
-/// 因此 `AttrBool` 的解析结果只取决于属性存在与否。
+/// **属性存在即为 true**，与属性的字面内容无关（`<x-flag>` 与 `<x-flag="">` 都是 true）。
 pub(all) enum AttrKind {
   AttrString
   AttrInt
@@ -22,8 +21,7 @@ pub extend AttrKind with @debug.Debug::{to_repr}
 /// 属性的值。
 ///
 /// 整数用 `Int` 承载。解析侧把可接受的位数限制为 **最多 9 位十进制数字**：
-/// `Int` 的宽度可能随后端而异，限制位数可以保证「不接受的值一律回退默认值」，
-/// 而不是在某些后端上静默溢出、在另一些后端上正常——跨后端行为必须一致。
+/// `Int` 宽度可能随后端而异，限制位数可保证非法值一律回退默认值、跨后端行为一致。
 pub(all) enum AttrValue {
   VString(String)
   VInt(Int32)
@@ -32,12 +30,11 @@ pub(all) enum AttrValue {
 } derive(Eq, @debug.Debug)
 
 ///|
-/// `derive(Eq)` 生成的方法默认会被隐式提升为普通方法（已废弃行为），
-/// 显式声明一次以保留 `==` 能力并消除该警告。
+/// 显式声明以消除派生方法被隐式提升的废弃警告。
 pub extend AttrValue with Eq::{equal, not_equal}
 
 ///|
-/// 同上：显式声明 `Debug` 的方法，消除隐式提升的废弃警告。
+/// 显式声明以消除派生方法被隐式提升的废弃警告。
 pub extend AttrValue with @debug.Debug::{to_repr}
 
 ///|
@@ -249,8 +246,7 @@ pub fn camel_to_kebab(name : String) -> String {
 /// 严格解析十进制整数。
 ///
 /// 接受：可选 `+`/`-`，随后 1–9 位十进制数字。前导零允许（`007` → 7）。
-/// 拒绝：空串、只有符号、空白、下划线、小数点、科学计数法、10 位及以上的数字
-/// （位数上限是为了让跨后端行为一致，见 `AttrValue` 的说明）。
+/// 拒绝：空串、只有符号、空白、下划线、小数点、科学计数法、10 位及以上的数字。
 pub fn parse_int(s : String) -> Int32? {
   let n = s.char_length()
   if n == 0 {

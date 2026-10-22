@@ -1,7 +1,7 @@
 // 由 moon-element CLI 生成的自定义元素骨架：x-counter（渲染模式：shadow）
 //
 // 使用方式：
-// 1) 在本包的 moon.pkg 里声明依赖（import 属于包配置，不能写进 .mbt）：
+// 1) 在本包的 moon.pkg 里声明依赖（import 属于包配置）：
 //      import {
 //        "chen333w/moon-element/core" @core,
 //        "chen333w/moon-element/dom" @dom,

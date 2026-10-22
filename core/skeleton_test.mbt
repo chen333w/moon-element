@@ -12,7 +12,7 @@ test "validate_tag_name: 合法名字" {
 
 ///|
 test "validate_tag_name: 拒绝不带连字符的名字" {
-  // 这是最容易犯的错：普通标签名不能注册成自定义元素
+  // 普通标签名不能注册成自定义元素
   assert_false(@core.validate_tag_name("mywidget"))
   assert_false(@core.validate_tag_name("div"))
   assert_false(@core.validate_tag_name(""))

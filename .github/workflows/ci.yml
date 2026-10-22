@@ -1,6 +1,5 @@
 # MoonBit 项目的 CI 门禁。
-# 结构参照官方 starter 模板（moonbit-community/starter）的 check.yml，
-# 动作版本固定到 commit SHA，避免上游 tag 漂移。
+# 结构参照 moonbit-community/starter 的 check.yml，动作版本固定到 commit SHA，避免上游 tag 漂移。
 name: ci
 
 on:
@@ -48,7 +47,7 @@ jobs:
       - name: Check all backends
         run: moon check --target all --deny-warn
 
-      # 公开接口（.mbti）必须与源码一致且已提交，防止接口悄悄漂移。
+      # 公开接口（.mbti）必须与源码一致且已提交，防止接口漂移。
       - name: Check public interfaces
         run: |
           moon info --target all
@@ -59,7 +58,6 @@ jobs:
         run: moon test --target all --deny-warn
 
       # 生成器漂移检查：仓库里的示例必须与 CLI 当前产出完全一致。
-      # 改了生成器却忘记重新生成示例，这一步会红。
       - name: "CLI: generated skeleton matches committed example"
         run: |
           moon run cmd/main -- x-counter > /tmp/generated-component.mbt
@@ -67,13 +65,13 @@ jobs:
           moon run cmd/main -- x-light-panel --mode light > /tmp/generated-light.mbt
           diff -u examples/generated-light-panel/component.mbt /tmp/generated-light.mbt
 
-      # 构建 demo 产物并在 node 里验证它真的能跑（D0 假设 3 的持续验证）。
+      # 构建 demo 产物并在 node 里无头验证。
       - name: Build demo and verify the artifact headlessly
         run: |
           moon build --target js --release
           node examples/demo/verify.mjs
 
-      # 覆盖率目前只作参考（CLI 入口与示例的运行路径不在单元测试覆盖范围内）。
+      # 覆盖率只作参考（CLI 入口与示例的运行路径不在单元测试覆盖范围内）。
       - name: Coverage (js, informational)
         run: |
           moon test --target js --enable-coverage

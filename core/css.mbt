@@ -13,7 +13,7 @@
 /// - 注释原样保留
 /// - `scope` 为空串时是恒等操作（不做任何改写）
 ///
-/// **已知限制**（刻意不做的部分，避免写一个完整的 CSS 解析器）：
+/// **已知限制**（未实现完整的 CSS 解析器）：
 /// - 声明块内部原样输出，不做压缩或重排
 /// - 字符串字面量或注释里出现的 `{` / `}` 会干扰块匹配
 /// - `::slotted()` / `:host-context()` 属于 shadow DOM 语义，未做等价转换
@@ -267,9 +267,8 @@ fn emit_selector(
     // :host → scope，并保留其后内容
     push_string(out, scope)
     if n > 5 && norm[5] == '(' {
-      // :host(.active) → scope.active
-      // 括号内是**复合选择器**，要直接接在 scope 后面（去掉括号本身），
-      // 而不是把括号原样搬过去——否则会输出 scope(.active)，在 CSS 里是无效选择器。
+      // :host(.active) → scope.active：括号内是复合选择器，直接接在 scope 后面，
+      // 否则会输出无效选择器 scope(.active)。
       let inner : Array[Char] = []
       let mut depth = 0
       let mut k = 6

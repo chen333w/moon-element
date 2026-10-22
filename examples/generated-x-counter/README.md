@@ -1,7 +1,6 @@
 # 生成器产出的示例组件
 
-这个目录的内容由 CLI **实际生成**，并**提交进仓库**，目的是让 CI 持续验证
-「骨架生成器的产物确实能编译」——如果生成器改坏了，CI 会红。
+本目录内容由 CLI 生成并提交，用于让 CI 持续验证骨架生成器的产物能编译。
 
 重新生成：
 
@@ -9,4 +8,4 @@
 moon run cmd/main -- x-counter > examples/generated-x-counter/component.mbt
 ```
 
-（`import` 属于包配置，所以依赖写在同目录的 `moon.pkg` 里，生成结果里只以注释提示。）
+`import` 属于包配置，依赖写在同目录的 `moon.pkg` 里，生成结果中只以注释提示。

@@ -3,9 +3,8 @@
 ///
 /// 三个字段直接对应 `CustomEvent` 的初始化项：
 /// - `bubbles`：是否冒泡到祖先
-/// - `composed`：是否能穿过 shadow 边界——**这条最容易被忘**。
-///   为了让宿主页面的监听者能收到组件内部抛出的事件，跨 shadow 边界的事件
-///   必须 `composed = true`，否则事件会在 shadow root 处被挡住。
+/// - `composed`：是否能穿过 shadow 边界。宿主页面要收到组件内部抛出的事件，
+///   跨 shadow 边界的事件必须 `composed = true`，否则会在 shadow root 处被挡住。
 pub struct EventSpec {
   name : String
   bubbles : Bool
@@ -50,8 +49,7 @@ pub fn EventSpec::composed(self : EventSpec) -> Bool {
 }
 
 ///|
-/// 事件名是否合法：非空、且不含 ASCII 空白（把 `"count change"` 这种
-/// 带空格的名字当成事件名是常见笔误，dispatch 出去永远没人收到）。
+/// 事件名是否合法：非空、且不含 ASCII 空白（带空格的名字 dispatch 出去没人会收到）。
 pub fn is_valid_event_name(name : String) -> Bool {
   let n = name.char_length()
   if n == 0 {
@@ -77,8 +75,7 @@ pub fn is_valid_event_name(name : String) -> Bool {
 ///|
 /// 一个组件声明的事件集合。
 ///
-/// 它的用途不是"省事"，而是**在派发前就能发现错误**：重名、非法名在注册阶段
-/// 就被挡住，而不是等到线上发现某个事件永远收不到。
+/// 重名与非法名在注册阶段就被挡住，不必等到派发时才发现事件收不到。
 pub struct EventRegistry {
   specs : Array[EventSpec]
 }

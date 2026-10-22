@@ -1,8 +1,5 @@
 ///|
-/// 自定义元素名校验与组件骨架生成。
-///
-/// 这两件事都是纯字符串逻辑，所以放在 `core` 里：可以在四个后端上测，
-/// CLI 只负责把结果打印出来。
+/// 元素名校验与骨架生成。纯字符串逻辑，放在 core 以便四后端测试；CLI 只负责打印。
 
 ///|
 /// 按 HTML 规范校验自定义元素名（custom element name）。
@@ -14,8 +11,7 @@
 /// - 不能以 `xml` 开头（大小写不敏感，规范保留）
 /// - 不能是保留名（`annotation-xml`、`color-profile`、`font-face` 等）
 ///
-/// 这里刻意**不**允许非 ASCII 字符：规范允许一部分，但把它留给后续迭代，
-/// 现在保守地拒绝比默默生成浏览器不认的名字要好。
+/// 只接受 ASCII 子集（规范允许部分非 ASCII），且不允许大写字母。
 pub fn validate_tag_name(tag : String) -> Bool {
   let n = tag.char_length()
   if n == 0 {
@@ -143,13 +139,12 @@ pub fn component_skeleton(
     LightDom => true
     ShadowDom => false
   }
-  // 用逐行拼接而不是 `#|` 多行字面量：`#|` 块是原始文本，不做 `\{...}` 插值，
-  // 写在那里会生成字面量 `\{tag}` 这种坏代码。
+  // 逐行拼接而非 `#|`：`#|` 是原始文本，不做 `\{...}` 插值。
   let lines : Array[String] = [
     "// 由 moon-element CLI 生成的自定义元素骨架：\{tag}（渲染模式：\{mode_name}）",
     "//",
     "// 使用方式：",
-    "// 1) 在本包的 moon.pkg 里声明依赖（import 属于包配置，不能写进 .mbt）：",
+    "// 1) 在本包的 moon.pkg 里声明依赖（import 属于包配置）：",
     "//      import {",
     "//        \"chen333w/moon-element/core\" @core,",
     "//        \"chen333w/moon-element/dom\" @dom,",
@@ -178,8 +173,7 @@ pub fn component_skeleton(
   lines.push("///|")
   lines.push("fn render_\{snake}(props : @core.Props) -> @core.View {")
   lines.push("  let label = props.get_string(\"label\").unwrap_or(\"\")")
-  // 这一行刻意写成单行：生成器要产出**已格式化**的代码，否则 `moon fmt` 会把
-  // 多行调用合并，导致提交的示例与 CLI 原始产出不一致（CI 的漂移检查会红）
+  // 保持单行输出：多行会被 `moon fmt` 合并，与提交的示例不一致（CI 漂移检查）
   lines.push(
     "  @core.View::element(\"span\", [(\"class\", \"label\")], [@core.View::text(label)])",
   )

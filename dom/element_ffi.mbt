@@ -1,19 +1,17 @@
 ///|
-/// D0 spike: prove that MoonBit's JavaScript backend can define and register a
-/// real Web Component (a class that `extends HTMLElement`, registered through
-/// `customElements.define`), and that a MoonBit function can be invoked back
-/// from the DOM callback path.
+/// D0 spike: define and register a real Web Component on the JavaScript backend
+/// (a class that `extends HTMLElement`, registered through
+/// `customElements.define`), and call back into MoonBit from the DOM callback
+/// path.
 ///
-/// This file is deliberately dependency-free: `install_dom_stub` provides a
-/// minimal DOM shim so the whole path is testable headlessly under
-/// `moon test --target js`, without a browser or a npm DOM emulator.
-///
-/// Findings are recorded in `docs/d0-assumptions.md`.
+/// `install_dom_stub` provides a minimal DOM shim, so the whole path runs
+/// headlessly under `moon test --target js` without a browser or a DOM
+/// emulator. Findings are recorded in `docs/feasibility.md`.
 
 ///|
 /// Install a minimal DOM shim when running headless (e.g. under node).
-/// It is a no-op when a real DOM is already present, so the same code runs in
-/// a browser page and in tests.
+/// No-op when a real DOM is present, so the same code runs in a browser page
+/// and in tests.
 pub extern "js" fn install_dom_stub() -> Unit =
   #|() => {
   #|  if (typeof globalThis.customElements === "undefined") {
@@ -72,12 +70,11 @@ pub extern "js" fn install_dom_stub() -> Unit =
   #|}
 
 ///|
-/// Define a custom element named `name` whose `connectedCallback` dispatches
-/// into `on_connected` (a MoonBit closed function).
+/// Define a custom element named `name` whose `connectedCallback` calls
+/// `on_connected`.
 ///
-/// The generated class genuinely extends `HTMLElement`, which is what the
-/// Custom Elements registry requires.
-/// The JavaScript backend supports closures natively, so a plain MoonBit
+/// The class extends `HTMLElement` directly, as the Custom Elements registry
+/// requires. The JS backend supports closures natively, so a plain MoonBit
 /// function type is used here rather than `FuncRef`.
 pub extern "js" fn define_element(
   name : String,
