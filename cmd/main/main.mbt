@@ -6,8 +6,6 @@
 /// moon run cmd/main -- x-counter
 /// moon run cmd/main -- --help
 /// ```
-///
-/// Generation lives in `core/skeleton.mbt`; this file only parses arguments and prints.
 
 ///|
 fn usage(cmd : @argparse.Command) -> Unit {
@@ -60,9 +58,8 @@ fn run() -> Unit {
   }
   if matches.values is { "tag": [tag, ..], .. } {
     match @core.component_skeleton(tag, mode~) {
-      // Generated content carries no trailing newline (println adds one), so a file
-      // written from it ends with exactly one newline, matching what moon fmt
-      // normalizes to; that is what makes the CI drift check meaningful.
+      // No trailing newline here (println adds one), so the written file matches what
+      // moon fmt normalizes to; the CI drift check relies on that.
       Some(code) => println(code)
       None => {
         println("Error: \"\{tag}\" is not a valid custom element name.")

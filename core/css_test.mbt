@@ -112,7 +112,6 @@ test "scope_css: at-rule names are case-insensitive (@MEDIA is scoped too)" {
 
 ///|
 test "scope_css: nested parentheses inside :host are kept verbatim" {
-  // :host(:is(.a, .b)) → my-el:is(.a, .b)
   inspect(
     @core.scope_css(":host(:is(.a, .b)) { color: red }", "my-el"),
     content="my-el:is(.a, .b) { color: red }",

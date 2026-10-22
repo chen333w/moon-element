@@ -1,24 +1,15 @@
 ///|
-/// D0 spike: define and register a real Web Component on the JavaScript backend
-/// (a class that `extends HTMLElement`, registered through
-/// `customElements.define`), and call back into MoonBit from the DOM callback
-/// path.
-///
-/// `install_dom_stub` provides a minimal DOM shim, so the whole path runs
-/// headlessly under `moon test --target js` without a browser or a DOM
-/// emulator. Findings are recorded in `docs/feasibility.md`.
+/// JS backend spike: register a real custom element and call back into MoonBit.
+/// `install_dom_stub` makes the path testable headlessly.
 
 ///|
-/// Install a minimal DOM shim when running headless (e.g. under node).
-/// No-op when a real DOM is present, so the same code runs in a browser page
-/// and in tests.
+/// Install a minimal DOM shim when running headless; no-op if a DOM is present.
 pub extern "js" fn install_dom_stub() -> Unit =
   #|() => {
   #|  if (typeof globalThis.customElements === "undefined") {
   #|    globalThis.__moon_element_registry = Object.create(null);
   #|    globalThis.HTMLElement = class HTMLElement {};
-  #|    // The real HTMLElement has attachShadow, so the stub needs one too;
-  #|    // otherwise the adapter shadow DOM path cannot be tested headlessly.
+  #|    // The stub needs attachShadow too, or the shadow DOM path is untestable headlessly.
   #|    globalThis.HTMLElement.prototype.attachShadow = function (opts) {
   #|      this.shadowRoot = {
   #|        innerHTML: "",
@@ -35,9 +26,7 @@ pub extern "js" fn install_dom_stub() -> Unit =
   #|        return globalThis.__moon_element_registry[name];
   #|      },
   #|    };
-  #|    // The three event pieces: CustomEvent, addEventListener, dispatchEvent.
-  #|    // Only the minimal subset the adapter and tests need (synchronous dispatch;
-  #|    // no capture or bubble path propagation).
+  #|    // Minimal event subset: synchronous dispatch, no capture or bubble propagation.
   #|    globalThis.CustomEvent = class CustomEvent {
   #|      constructor(type, init) {
   #|        this.type = type;
@@ -64,19 +53,14 @@ pub extern "js" fn install_dom_stub() -> Unit =
   #|      for (const fn of list) {
   #|        fn(ev);
   #|      }
-  #|      // Browser semantics: returning false means a listener canceled the default action
   #|      return !ev.defaultPrevented;
   #|    };
   #|  }
   #|}
 
 ///|
-/// Define a custom element named `name` whose `connectedCallback` calls
-/// `on_connected`.
-///
-/// The class extends `HTMLElement` directly, as the Custom Elements registry
-/// requires. The JS backend supports closures natively, so a plain MoonBit
-/// function type is used here rather than `FuncRef`.
+/// The JS backend supports closures natively, so this takes a plain MoonBit
+/// function type rather than `FuncRef`.
 pub extern "js" fn define_element(
   name : String,
   on_connected : () -> Unit,
@@ -91,8 +75,6 @@ pub extern "js" fn define_element(
   #|}
 
 ///|
-/// Headless probe: is `name` registered, and is its prototype chain rooted in
-/// `HTMLElement`? Returns `false` for unknown names.
 pub extern "js" fn is_registered_element(name : String) -> Bool =
   #|(name) => {
   #|  const ctor = globalThis.customElements.get(name);
@@ -103,8 +85,6 @@ pub extern "js" fn is_registered_element(name : String) -> Bool =
   #|}
 
 ///|
-/// Headless probe: instantiate the registered element once and invoke its
-/// `connectedCallback`. Used to exercise the DOM → MoonBit direction.
 pub extern "js" fn fire_connected(name : String) -> Unit =
   #|(name) => {
   #|  const ctor = globalThis.customElements.get(name);
@@ -115,14 +95,11 @@ pub extern "js" fn fire_connected(name : String) -> Unit =
   #|}
 
 ///|
-/// A marker incremented from JavaScript. Used as the MoonBit callback so the
-/// test can tell whether MoonBit code actually ran.
 pub extern "js" fn js_mark() -> Unit =
   #|() => {
   #|  globalThis.__moon_element_marks = (globalThis.__moon_element_marks || 0) + 1;
   #|}
 
 ///|
-/// How many times `js_mark` ran.
 pub extern "js" fn js_mark_count() -> Int32 =
   #|() => globalThis.__moon_element_marks || 0

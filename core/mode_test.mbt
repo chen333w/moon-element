@@ -1,6 +1,5 @@
 ///|
-/// Parsing and naming for RenderMode: the CLI and config depend on it, so a misspelling
-/// must be caught rather than silently defaulting.
+/// Parsing and naming for RenderMode (used by the CLI and config).
 
 ///|
 test "RenderMode: accepts only shadow / light" {

@@ -35,7 +35,7 @@ test "Props: invalid values fall back to the default instead of raising" {
   let props = @core.Props::new(badge_specs())
   assert_true(props.apply("max-count", Some("abc")))
   assert_eq(props.get_int("max-count"), Some(3))
-  // set a valid value, then an invalid one: it must fall back to the default, not keep the old value
+  // valid then invalid: falls back to the default, not the old value
   assert_true(props.apply("max-count", Some("9")))
   assert_eq(props.get_int("max-count"), Some(9))
   assert_true(props.apply("max-count", Some("9.5")))

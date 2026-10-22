@@ -1,7 +1,5 @@
 ///|
-/// Black-box tests for attribute reflection: assertions go only through the public
-/// `core` API.
-/// These tests do not touch the DOM, so they run on every backend (`moon test --target all`).
+/// Black-box tests for attribute reflection (no DOM, runs on every backend).
 
 ///|
 fn close(actual : Double?, expected : Double) -> Bool {

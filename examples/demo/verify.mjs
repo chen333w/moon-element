@@ -1,5 +1,4 @@
-// Headless verification: import the build artifact in node (the same file the browser
-// loads) and check that it really registers the components and works.
+// Headless check: imports the build artifact (the file the browser loads) in node.
 //
 // Usage, from the repository root:
 //   moon build --target js --release
@@ -9,9 +8,7 @@
 
 import { pathToFileURL } from "node:url";
 
-// ---------------------------------------------------------------------------
-// Minimal DOM stub, equivalent to install_dom_stub in dom/element_ffi.mbt
-// ---------------------------------------------------------------------------
+// Minimal DOM stub, equivalent to install_dom_stub in dom/element_ffi.mbt.
 function installDomStub() {
   if (globalThis.customElements) return;
   globalThis.HTMLElement = class HTMLElement {};
@@ -57,9 +54,7 @@ function installDomStub() {
   globalThis.__stubRegistry = registry;
 }
 
-// ---------------------------------------------------------------------------
 // Minimal assertions
-// ---------------------------------------------------------------------------
 let failed = 0;
 let passed = 0;
 function check(name, cond, detail) {
@@ -82,7 +77,7 @@ console.log(`bundle: ${bundlePath.pathname}`);
 
 installDomStub();
 
-// Import the build artifact directly (in the browser: <script type="module" src="....js">).
+// In the browser this is <script type="module" src="....js">.
 let importError = null;
 try {
   await import(pathToFileURL(bundlePath.pathname).href);
@@ -153,12 +148,11 @@ if (typeof registry["x-counter"] === "function") {
     "the card renders title and body",
     k.shadowRoot.innerHTML.includes(">T</div>") && k.shadowRoot.innerHTML.includes(">B</div>"),
   );
-  // The browser unescapes on display; here we only check the escaped text is preserved.
   k.attributeChangedCallback("body", "B", "<i>x</i>");
   check("the card body is escaped as well", k.shadowRoot.innerHTML.includes("&lt;i&gt;x&lt;/i&gt;"));
 }
 
-// x-panel: light DOM mode (no shadow root; scope_css scopes styles to the tag name)
+// x-panel: light DOM mode
 if (typeof registry["x-panel"] === "function") {
   const panel = new registry["x-panel"]();
   panel.connectedCallback();

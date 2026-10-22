@@ -1,24 +1,7 @@
 ///|
-/// Rewrite a `:host`-style stylesheet into a plain stylesheet rooted at `scope`.
-///
-/// **Purpose**: where shadow DOM is unavailable (SSR output, light DOM components,
-/// older environments), one selector prefix gives the same style isolation.
-///
-/// Rules:
-/// - normal rules: prefix every selector with `scope ` (descendant combinator)
-/// - `:host` → scope; `:host(.active)` → `scope.active`; `:host .child` → `scope .child`
-/// - a comma-separated selector list is split first; **commas inside parentheses are
-///   not separators** (`:is(a, b)` is not split)
-/// - `@media` / `@supports` / `@container` / `@layer`: recurse into the nested rules
-/// - other at-rules (e.g. `@keyframes`): kept verbatim — keyframe selectors are
-///   `from`/`0%` and must not be prefixed
-/// - comments are kept verbatim
-/// - an empty `scope` is the identity transform (nothing is rewritten)
-///
-/// **Known limitations** (this is not a full CSS parser):
-/// - declaration blocks are emitted verbatim, with no minification or reordering
-/// - `{` / `}` inside string literals or comments break block matching
-/// - `::slotted()` / `:host-context()` are shadow DOM semantics and have no equivalent here
+/// Rewrite a `:host`-style stylesheet into a plain one rooted at `scope`. Commas inside
+/// parentheses do not split a selector list; `:host(.active)` becomes `scope.active`, not
+/// `scope(.active)`; `@keyframes` stays verbatim. Not a full CSS parser.
 pub fn scope_css(css : String, scope : String) -> String {
   let chars : Array[Char] = []
   push_string(chars, css)
@@ -50,7 +33,6 @@ fn copy_range(
 }
 
 ///|
-/// Scan the CSS fragment `[start, end)` and write the scoped result to `out`.
 fn scope_range(
   chars : Array[Char],
   start : Int32,
@@ -62,7 +44,6 @@ fn scope_range(
   while i < end {
     let c = chars[i]
     if c == '/' && i + 1 < end && chars[i + 1] == '*' {
-      // comment: copy verbatim up to "*/"
       out.push(c)
       out.push(chars[i + 1])
       i = i + 2
@@ -82,7 +63,6 @@ fn scope_range(
       out.push(c)
       i = i + 1
     } else {
-      // collect the prelude up to '{' or ';'
       let prelude : Array[Char] = []
       let mut j = i
       while j < end && chars[j] != '{' && chars[j] != ';' {
@@ -90,7 +70,7 @@ fn scope_range(
         j = j + 1
       }
       if j >= end || chars[j] == ';' {
-        // at-statement (e.g. @import) or truncated input: emit verbatim
+        // @import or truncated input: emit verbatim
         for prelude_char in prelude {
           out.push(prelude_char)
         }
@@ -101,7 +81,6 @@ fn scope_range(
           i = j
         }
       } else {
-        // find the matching '}'
         let inner_start = j + 1
         let mut depth = 1
         let mut k = inner_start
@@ -125,8 +104,6 @@ fn scope_range(
 }
 
 ///|
-/// Emit one rule's prelude and block contents, rewriting or copying the block
-/// depending on the rule.
 fn emit_rule(
   chars : Array[Char],
   prelude : Array[Char],
@@ -138,14 +115,13 @@ fn emit_rule(
   let lead = first_non_ws(prelude)
   if lead < prelude.length() && prelude[lead] == '@' {
     if is_conditional_group(prelude, lead) {
-      // recurse into the rules inside the group
       copy_trimmed(prelude, out)
       out.push(' ')
       out.push('{')
       scope_range(chars, inner_start, inner_end, scope, out)
       out.push('}')
     } else {
-      // @keyframes and similar: keep the whole rule verbatim
+      // @keyframes and similar: kept verbatim
       copy_trimmed(prelude, out)
       out.push(' ')
       out.push('{')
@@ -181,8 +157,6 @@ fn copy_trimmed(chars : Array[Char], out : Array[Char]) -> Unit {
 }
 
 ///|
-/// Whether the prelude starts with `@media` / `@supports` / `@container` / `@layer`
-/// (case-insensitive).
 fn is_conditional_group(prelude : Array[Char], lead : Int32) -> Bool {
   let name : Array[Char] = []
   let mut i = lead + 1
@@ -212,8 +186,6 @@ fn ascii_lower_char(c : Char) -> Char {
 }
 
 ///|
-/// Scope a comma-separated selector list: prefix each selector and join with `, `.
-/// A comma at parenthesis depth > 0 is not a separator.
 fn scope_selector_list(
   prelude : Array[Char],
   lead : Int32,
@@ -249,7 +221,6 @@ fn scope_selector_list(
 }
 
 ///|
-/// Emit one selector: normalize whitespace, then apply the `:host` rules.
 fn emit_selector(
   prelude : Array[Char],
   start : Int32,
@@ -268,11 +239,9 @@ fn emit_selector(
     norm[2] == 'o' &&
     norm[3] == 's' &&
     norm[4] == 't' {
-    // :host → scope, keeping whatever follows
     push_string(out, scope)
     if n > 5 && norm[5] == '(' {
-      // :host(.active) → scope.active: the parentheses hold a compound selector that
-      // attaches directly to scope. Emitting scope(.active) would be an invalid selector.
+      // :host(.active) → scope.active; scope(.active) would be invalid
       let inner : Array[Char] = []
       let mut depth = 0
       let mut k = 6
@@ -308,8 +277,6 @@ fn emit_selector(
 }
 
 ///|
-/// Normalize selector whitespace: collapse runs of whitespace to one space and trim
-/// both ends.
 fn normalize_ws(chars : Array[Char], start : Int32, end : Int32) -> Array[Char] {
   let out : Array[Char] = []
   let mut i = start

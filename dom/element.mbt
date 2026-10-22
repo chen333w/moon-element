@@ -1,14 +1,7 @@
 ///|
-/// Browser adapter: wires the `core` attribute specs and lifecycle state machine
-/// onto the real custom element callbacks (`observedAttributes` /
-/// `attributeChangedCallback` / `connectedCallback` / `disconnectedCallback`) and
-/// writes the render output into the shadow root.
-///
-/// Attribute parsing, fallback and lifecycle rules live in `core`; this file only
-/// does the DOM wiring and instance state management.
+/// Browser adapter for `core`: DOM wiring and instance state.
 
 ///|
-/// Static definition of a registered component, shared by all instances of a tag.
 priv struct ComponentDef {
   tag : String
   specs : Array[@core.AttrSpec]
@@ -19,24 +12,19 @@ priv struct ComponentDef {
 }
 
 ///|
-/// MoonBit-side state of one element instance.
 priv struct Instance {
   props : @core.Props
   lifecycle : @core.Lifecycle
   render_fn : (@core.Props) -> @core.View
   event_registry : @core.EventRegistry
-  // Dispatched events (diagnostics and tests): "name:detail:canceled"
   event_log : Array[String]
-  // Needed at render time: scopes scope_css in light mode
   tag : String
   styles : String
   mode : @core.RenderMode
 }
 
 ///|
-/// Instance registry: the index is the instance id (slot 0 is a placeholder; JS
-/// assigns ids by incrementing). An array instead of a hash map: one less
-/// dependency, and id and index correspond one to one.
+/// Instance registry keyed by instance id; slot 0 is unused.
 let instances : Array[Instance?] = [None]
 
 ///|
@@ -49,9 +37,8 @@ fn instance_get(id : Int32) -> Instance? {
 }
 
 ///|
-/// Write instance state back.
-/// Always writes back and does not rely on struct alias semantics, so a state
-/// change reaches the registry even if `instance_get` returned a copy.
+/// Always writes back and does not rely on struct alias semantics: the change
+/// lands in the registry even if `instance_get` returned a copy.
 fn instance_put(id : Int32, inst : Instance) -> Unit {
   while instances.length() <= id {
     instances.push(None)
@@ -93,9 +80,8 @@ fn paint(id : Int32) -> Unit {
       let html = if inst.styles == "" {
         body
       } else {
-        // In light mode component CSS leaks into the whole page, so scope it to
-        // the tag name first; shadow mode injects it as is (`:host` is only
-        // valid inside a shadow root)
+        // Light mode: component CSS leaks into the page, so scope it to the tag.
+        // Shadow mode: inject as is (`:host` is valid only inside a shadow root).
         let css = match inst.mode {
           @core.ShadowDom => inst.styles
           @core.LightDom => @core.scope_css(inst.styles, inst.tag)
@@ -112,25 +98,8 @@ fn paint(id : Int32) -> Unit {
 }
 
 ///|
-/// Define a custom element (`define` is a reserved word, hence `define_component`).
-///
-/// - `specs` drives `observedAttributes`: only the listed attributes trigger callbacks
-/// - `render_fn` runs when the element connects and when any observed attribute
-///   changes while the element is connected; the returned view is rendered to HTML
-///   and written into the shadow root
-/// - attributes set before connection (what the browser does when upgrading an
-///   existing element) are handled too
-/// - `events` declares the events this component dispatches (names are validated,
-///   duplicates rejected); the declaration decides bubbles / composed at dispatch
-///   time. Undeclared events can still be dispatched, with conservative defaults
-/// - `on_change` runs after every observed attribute change once state updates
-///   (re-render included) are done, with (instance id, attribute name) as
-///   arguments; a component dispatches outward events from here via `dispatch`
-/// - `styles` is the component CSS, written once: injected as is in shadow mode
-///   (`:host` works there), scoped to the tag name with `scope_css` first in light
-///   mode
-/// - `mode` picks shadow DOM (default) or light DOM; light mode suits SSR output
-///   or cases where host styles must reach the component
+/// Define a custom element (`define` is a reserved word). Attributes set before
+/// connection (element upgrade) are handled.
 pub fn define_component(
   tag : String,
   specs : Array[@core.AttrSpec],
@@ -145,7 +114,6 @@ pub fn define_component(
     @core.ShadowDom => true
     @core.LightDom => false
   }
-  // FixedArray has a fixed length (no push): allocate first, then assign by index
   let observed : FixedArray[String] = FixedArray::make(specs.length(), "")
   let mut oi = 0
   while oi < specs.length() {
@@ -165,9 +133,8 @@ pub fn define_component(
       None => ()
     }
   }
-  // Old/new values cross the FFI as (presence Bool + String) rather than String?:
-  // the Option representation is not a stable ABI, so an explicit presence flag is
-  // more reliable.
+  // Old/new values cross the FFI as (Bool + String) rather than String?: the Option
+  // representation is not a stable ABI.
   let on_attribute : (Int32, String, Bool, String, Bool, String) -> Unit = fn(
     id,
     name,
@@ -186,7 +153,7 @@ pub fn define_component(
     if inst.lifecycle.is_connected() {
       paint(id)
     }
-    // Notify the caller after state and DOM are updated, so the callback sees consistent state
+    // Notify after state and DOM are updated.
     on_change(id, name)
   }
   js_define(
@@ -195,7 +162,6 @@ pub fn define_component(
 }
 
 ///|
-/// Lifecycle reaction log of an instance, for diagnostics and tests.
 pub fn instance_reaction_log(id : Int32) -> Array[String] {
   match instance_get(id) {
     Some(inst) => inst.lifecycle.reaction_log()
@@ -204,7 +170,7 @@ pub fn instance_reaction_log(id : Int32) -> Array[String] {
 }
 
 ///|
-/// Current attribute value of an instance (parsed and fallback applied), for diagnostics and tests.
+/// Parsed value; fallback already applied.
 pub fn instance_prop(id : Int32, attr_name : String) -> @core.AttrValue? {
   match instance_get(id) {
     Some(inst) => inst.props.get(attr_name)
@@ -213,7 +179,6 @@ pub fn instance_prop(id : Int32, attr_name : String) -> @core.AttrValue? {
 }
 
 ///|
-/// Current string attribute of an instance, for diagnostics and tests.
 pub fn instance_prop_string(id : Int32, attr_name : String) -> String? {
   match instance_get(id) {
     Some(inst) => inst.props.get_string(attr_name)
@@ -222,7 +187,6 @@ pub fn instance_prop_string(id : Int32, attr_name : String) -> String? {
 }
 
 ///|
-/// Current integer attribute of an instance, for diagnostics and tests.
 pub fn instance_prop_int(id : Int32, attr_name : String) -> Int32? {
   match instance_get(id) {
     Some(inst) => inst.props.get_int(attr_name)
@@ -230,18 +194,9 @@ pub fn instance_prop_int(id : Int32, attr_name : String) -> Int32? {
   }
 }
 
-// ---------------------------------------------------------------------------
-// JS-side wiring and test probes. In a real browser the browser fires these
-// callbacks; headlessly (node) the probes replay the same call order.
-// ---------------------------------------------------------------------------
+// JS-side wiring and test probes; headlessly the probes replay the browser call order.
 
 ///|
-/// Register a custom element class:
-/// - the constructor assigns the instance id and records it in the id -> element map
-/// - `observedAttributes` comes from the specs
-/// - `connectedCallback` creates the shadow root on demand, then enters MoonBit
-/// - `attributeChangedCallback` turns null old/new values into (presence + string)
-///   before entering MoonBit
 extern "js" fn js_define(
   tag : String,
   observed : FixedArray[String],
@@ -269,7 +224,6 @@ extern "js" fn js_define(
   #|      return observed;
   #|    }
   #|    connectedCallback() {
-  #|      // light mode creates no shadow root: content goes into the element itself
   #|      if (useShadow && !this.shadowRoot) {
   #|        this.attachShadow({ mode: "open" });
   #|      }
@@ -281,7 +235,7 @@ extern "js" fn js_define(
   #|    attributeChangedCallback(name, oldValue, newValue) {
   #|      const hadOld = oldValue !== null && oldValue !== undefined;
   #|      const hasNew = newValue !== null && newValue !== undefined;
-  #|      // remember the current value so the next probe reports the right oldValue (the browser does the same)
+  #|      // Keep the current value so the next probe reports the right oldValue.
   #|      if (hasNew) {
   #|        this.__moonAttrs[name] = String(newValue);
   #|      } else {
@@ -312,7 +266,6 @@ extern "js" fn js_set_shadow_html(id : Int32, html : String) -> Unit =
   #|}
 
 ///|
-/// Light mode: write the render output into the element itself (no shadow root)
 extern "js" fn js_set_inner_html(id : Int32, html : String) -> Unit =
   #|(id, html) => {
   #|  const reg = globalThis.__moon_element_instances;
@@ -323,7 +276,6 @@ extern "js" fn js_set_inner_html(id : Int32, html : String) -> Unit =
   #|}
 
 ///|
-/// Probe: innerHTML of the element itself (asserted in light mode; empty in shadow mode)
 pub extern "js" fn probe_inner_html(id : Int32) -> String =
   #|(id) => {
   #|  const reg = globalThis.__moon_element_instances;
@@ -332,7 +284,6 @@ pub extern "js" fn probe_inner_html(id : Int32) -> String =
   #|}
 
 ///|
-/// Probe: `observedAttributes` of a tag.
 pub fn probe_observed(tag : String) -> Array[String] {
   let out : Array[String] = []
   for name in js_probe_observed(tag) {
@@ -351,7 +302,6 @@ extern "js" fn js_probe_observed(tag : String) -> FixedArray[String] =
   #|}
 
 ///|
-/// Probe: create an instance and return its id (the constructor assigns the id).
 pub extern "js" fn probe_create(tag : String) -> Int32 =
   #|(tag) => {
   #|  const reg = globalThis.__moon_element_instances;
@@ -364,7 +314,6 @@ pub extern "js" fn probe_create(tag : String) -> Int32 =
   #|}
 
 ///|
-/// Probe: simulate the browser inserting the element into the document.
 pub extern "js" fn probe_connect(id : Int32) -> Unit =
   #|(id) => {
   #|  const reg = globalThis.__moon_element_instances;
@@ -375,7 +324,6 @@ pub extern "js" fn probe_connect(id : Int32) -> Unit =
   #|}
 
 ///|
-/// Probe: simulate the browser removing the element from the document.
 pub extern "js" fn probe_disconnect(id : Int32) -> Unit =
   #|(id) => {
   #|  const reg = globalThis.__moon_element_instances;
@@ -386,7 +334,6 @@ pub extern "js" fn probe_disconnect(id : Int32) -> Unit =
   #|}
 
 ///|
-/// Probe: simulate the browser setting an attribute (oldValue comes from the last record).
 pub extern "js" fn probe_set_attribute(
   id : Int32,
   name : String,
@@ -407,7 +354,6 @@ pub extern "js" fn probe_set_attribute(
   #|}
 
 ///|
-/// Probe: simulate the browser removing an attribute.
 pub extern "js" fn probe_remove_attribute(id : Int32, name : String) -> Unit =
   #|(id, name) => {
   #|  const reg = globalThis.__moon_element_instances;
@@ -424,7 +370,6 @@ pub extern "js" fn probe_remove_attribute(id : Int32, name : String) -> Unit =
   #|}
 
 ///|
-/// Probe: current HTML of the instance shadow root.
 pub extern "js" fn probe_shadow_html(id : Int32) -> String =
   #|(id) => {
   #|  const reg = globalThis.__moon_element_instances;

@@ -1,12 +1,6 @@
 ///|
-/// A view tree.
-///
-/// Expresses only elements, attributes, children, text, and fragments. Rendering is a
-/// pure function, testable with plain unit tests on all four backends; mounting into the
-/// DOM is the adapter's job.
-///
-/// - `VText` is HTML-escaped; `VRaw` is not, and the caller owns safety
-/// - `VElement` is (tag name, attribute list, children)
+/// A view tree: elements, attributes, children, text, and fragments. `VText` is
+/// HTML-escaped while `VRaw` is not and the caller owns safety.
 pub(all) enum View {
   VText(String)
   VRaw(String)
@@ -21,7 +15,7 @@ pub fn View::text(s : String) -> View {
 }
 
 ///|
-/// Emit verbatim, **without escaping**; use only where the content is fully controlled.
+/// Emit verbatim without escaping; the caller owns safety.
 pub fn View::raw(s : String) -> View {
   VRaw(s)
 }
@@ -46,7 +40,7 @@ pub fn View::nothing() -> View {
 }
 
 ///|
-/// Void elements: no closing tag per the HTML spec, and no children are rendered.
+/// Void elements: no closing tag and no children, per the HTML spec.
 fn is_void_tag(tag : String) -> Bool {
   for
     name in [
@@ -74,8 +68,7 @@ fn push_string(out : Array[Char], s : String) -> Unit {
 }
 
 ///|
-/// HTML text escaping. Works on code points, so it does not depend on escape sequences
-/// in character literals: `&`(38) `<`(60) `>`(62) `"`(34) `'`(39).
+/// Escape `&`, `<`, `>`, `"` and `'` for HTML.
 pub fn escape_text(s : String) -> String {
   let out : Array[Char] = []
   let n = s.char_length()
@@ -126,7 +119,6 @@ fn render_into(view : View, pieces : Array[String]) -> Unit {
         pieces.push("\"")
       }
       pieces.push(">")
-      // void elements render no children
       if !is_void_tag(tag) {
         for child in children {
           render_into(child, pieces)
@@ -140,13 +132,8 @@ fn render_into(view : View, pieces : Array[String]) -> Unit {
 }
 
 ///|
-/// Render a view tree to an HTML string.
-///
-/// The output is deterministic: attributes are emitted in the given order, with no
-/// reordering or deduplication (the caller guarantees unique attributes).
-///
-/// String concatenation here is the naive O(n²) `out = out + piece`. That is fine at the
-/// current scale; switch to a buffered writer when real performance needs appear.
+/// Render a view tree to an HTML string. Attribute order is preserved, with no reordering
+/// or deduplication; the concatenation is the naive O(n²) `out = out + piece`.
 pub fn render(view : View) -> String {
   let pieces : Array[String] = []
   render_into(view, pieces)

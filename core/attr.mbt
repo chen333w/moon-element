@@ -1,9 +1,6 @@
 ///|
-/// Attribute value types, plus the rules that map an HTML attribute string to a
-/// MoonBit value.
-///
-/// Boolean attributes follow HTML semantics: **presence means true**, independent of
-/// the literal content (`<x-flag>` and `<x-flag="">` are both true).
+/// Attribute value types. Boolean attributes follow HTML semantics: presence means true,
+/// regardless of the literal content (`<x-flag>` and `<x-flag="">` are both true).
 pub(all) enum AttrKind {
   AttrString
   AttrInt
@@ -12,19 +9,16 @@ pub(all) enum AttrKind {
 } derive(Eq, @debug.Debug)
 
 ///|
-/// `derive` produces these as implicitly promoted methods (deprecated); declare them
-/// explicitly to silence the warning.
+/// Implicitly promoted derived methods are deprecated; declare them explicitly to
+/// silence the warning.
 pub extend AttrKind with Eq::{equal, not_equal}
 
 ///|
 pub extend AttrKind with @debug.Debug::{to_repr}
 
 ///|
-/// An attribute value.
-///
-/// Integers are carried as `Int`. The parsers accept at most **9 decimal digits**:
-/// `Int` width may differ between backends, so capping the digit count keeps invalid
-/// values on the default and behaviour identical across backends.
+/// An attribute value. Integers are carried as `Int`; the parsers accept at most 9
+/// decimal digits because `Int` width differs between backends.
 pub(all) enum AttrValue {
   VString(String)
   VInt(Int32)
@@ -33,19 +27,14 @@ pub(all) enum AttrValue {
 } derive(Eq, @debug.Debug)
 
 ///|
-/// Declare explicitly to silence the deprecation warning for implicitly promoted derived methods.
 pub extend AttrValue with Eq::{equal, not_equal}
 
 ///|
-/// Declare explicitly to silence the deprecation warning for implicitly promoted derived methods.
 pub extend AttrValue with @debug.Debug::{to_repr}
 
 ///|
-/// Specification of one observable attribute.
-///
-/// - `attr_name` is the HTML-side name, kebab-case by convention (e.g. `max-count`)
-/// - `prop_name()` derives the MoonBit-side camelCase name, so the two cannot drift apart
-/// - `default` is used when the attribute is missing **or its value is invalid**
+/// Specification of one observable attribute. `attr_name` is the HTML-side kebab-case name
+/// (e.g. `max-count`); `default` is used when the attribute is missing or invalid.
 pub struct AttrSpec {
   attr_name : String
   kind : AttrKind
@@ -73,7 +62,6 @@ pub fn AttrSpec::bool(attr_name : String, default : Bool) -> AttrSpec {
 }
 
 ///|
-/// MoonBit-side attribute name: `max-count` → `maxCount`.
 pub fn AttrSpec::prop_name(self : AttrSpec) -> String {
   kebab_to_camel(self.attr_name)
 }
@@ -94,11 +82,8 @@ pub fn AttrSpec::default_value(self : AttrSpec) -> AttrValue {
 }
 
 ///|
-/// Parse a raw attribute value.
-///
-/// - `None` (attribute absent or removed) → the default
-/// - invalid string (e.g. `"abc"` for `AttrInt`) → the **default**, matching HTML's lenient semantics
-/// - `AttrBool`: any `Some(_)` is true (presence means true)
+/// Parse a raw attribute value. `None` or an invalid string yields the default (HTML's
+/// lenient semantics); for `AttrBool` any `Some(_)` is true.
 pub fn AttrSpec::parse(self : AttrSpec, raw : String?) -> AttrValue {
   match raw {
     None => self.default
@@ -121,11 +106,8 @@ pub fn AttrSpec::parse(self : AttrSpec, raw : String?) -> AttrValue {
 }
 
 ///|
-/// Value → attribute string. `None` means the attribute should be removed.
-///
-/// Only `VBool(false)` returns `None`: a boolean's state lives in whether the attribute
-/// is present, not in its text. Setting the string to `"false"` cannot express false —
-/// it would parse back as true under presence-means-true.
+/// Value to attribute string; `None` means remove the attribute. Only `VBool(false)`
+/// returns `None`, since `"false"` would parse back as true.
 pub fn AttrValue::to_attr(self : AttrValue) -> String? {
   match self {
     VString(s) => Some(s)
@@ -137,7 +119,7 @@ pub fn AttrValue::to_attr(self : AttrValue) -> String? {
 }
 
 ///|
-/// Derive `observedAttributes` from the specs: only these names receive change callbacks.
+/// Names exposed as `observedAttributes`; only these receive change callbacks.
 pub fn observed_attributes(specs : Array[AttrSpec]) -> Array[String] {
   let out : Array[String] = []
   for spec in specs {
@@ -193,10 +175,8 @@ fn ascii_to_lower(c : Char) -> Char {
 }
 
 ///|
-/// `max-count` → `maxCount` (ASCII kebab-case to camelCase).
-///
-/// Consecutive hyphens capitalize only once (`a--b` → `aB`); a trailing hyphen is
-/// ignored (`a-` → `a`); a leading hyphen capitalizes the first character (`-a` → `A`).
+/// ASCII kebab-case to camelCase. Consecutive hyphens capitalize once (`a--b` → `aB`), a
+/// trailing hyphen is ignored, a leading hyphen capitalizes the first character.
 pub fn kebab_to_camel(name : String) -> String {
   let out : Array[Char] = []
   let n = name.char_length()
@@ -221,10 +201,8 @@ pub fn kebab_to_camel(name : String) -> String {
 }
 
 ///|
-/// `maxCount` → `max-count` (ASCII camelCase to kebab-case).
-///
-/// Inserts a hyphen before every uppercase character except the first
-/// (`MaxCount` → `max-count`).
+/// ASCII camelCase to kebab-case; a hyphen goes before every uppercase character except
+/// the first (`MaxCount` → `max-count`).
 pub fn camel_to_kebab(name : String) -> String {
   let out : Array[Char] = []
   let n = name.char_length()
@@ -248,11 +226,8 @@ pub fn camel_to_kebab(name : String) -> String {
 }
 
 ///|
-/// Parse a strict decimal integer.
-///
-/// Accepts an optional `+`/`-` followed by 1–9 decimal digits; leading zeros are allowed
-/// (`007` → 7). Rejects empty input, a sign alone, whitespace, underscores, decimal
-/// points, scientific notation, and 10 or more digits.
+/// Strict decimal integer: optional `+`/`-`, 1–9 digits, leading zeros allowed. Rejects
+/// whitespace, `_`, `.`, scientific notation and 10 or more digits.
 pub fn parse_int(s : String) -> Int32? {
   let n = s.char_length()
   if n == 0 {
@@ -301,16 +276,8 @@ pub fn parse_int(s : String) -> Int32? {
 }
 
 ///|
-/// Parse a strict decimal number.
-///
-/// Accepts an optional `+`/`-`, 0–9 integer digits, and an optional `.` followed by 1–9
-/// fractional digits; integer and fractional digits together must number at least 1
-/// (so `.5` and `5` are valid, while `.` and `5.` are not). Rejects whitespace,
-/// scientific notation (`1e3`), hexadecimal, multiple decimal points, and more than 9
-/// fractional digits.
-///
-/// The fractional part accumulates as an integer and is divided once at the end, which
-/// limits accumulated rounding error.
+/// Strict decimal number: optional `+`/`-`, optional `.` with 1–9 fractional digits
+/// (`.5` is valid, `5.` is not). Rejects `1e3`, hex, multiple dots and 10+ digits.
 pub fn parse_double(s : String) -> Double? {
   let n = s.char_length()
   if n == 0 {

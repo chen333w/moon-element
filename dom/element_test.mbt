@@ -1,9 +1,6 @@
 ///|
-/// Black-box tests for the browser adapter.
-///
-/// Headless (node), the probes replay the browser call order:
-/// `new` -> `attributeChangedCallback` -> `connectedCallback` -> attribute change
-/// -> `disconnectedCallback`.
+/// Black-box tests for the browser adapter; headlessly the probes replay the
+/// browser call order.
 
 ///|
 fn specs() -> Array[@core.AttrSpec] {
@@ -15,7 +12,6 @@ fn specs() -> Array[@core.AttrSpec] {
 }
 
 ///|
-/// Render function under test: renders two attribute values as span text.
 fn render_badge(props : @core.Props) -> @core.View {
   let label = props.get_string("label").unwrap_or("?")
   let count = props.get_int("max-count").unwrap_or(0)
@@ -36,11 +32,10 @@ test "adapter: attribute set before connection (upgrading an existing element)" 
   @dom.install_dom_stub()
   @dom.define_component("x-badge-2", specs(), render_badge)
   let id = @dom.probe_create("x-badge-2")
-  // The browser fires observed attribute callbacks before connectedCallback when upgrading
+  // Upgrading fires attribute callbacks before connectedCallback
   @dom.probe_set_attribute(id, "label", "hi")
   assert_eq(@dom.instance_prop_string(id, "label"), Some("hi"))
   assert_eq(@dom.instance_reaction_log(id), ["attribute:label:<none>->hi"])
-  // No render while disconnected
   assert_eq(@dom.probe_shadow_html(id), "")
 }
 
@@ -151,7 +146,6 @@ test "adapter: on_change fires after the state update and can dispatch outward e
   assert_eq(@dom.instance_event_log(id), [
     "changed|label|canceled=false", "changed|max-count|canceled=false",
   ])
-  // The callback runs after rendering: the DOM already holds the new value
   assert_eq(@dom.probe_shadow_html(id), "<span class=\"badge\">x:5</span>")
 }
 
@@ -171,7 +165,6 @@ test "adapter: disconnect before connect (element created but no callback ever f
   @dom.install_dom_stub()
   @dom.define_component("x-never-connected", specs(), render_badge)
   let id = @dom.probe_create("x-never-connected")
-  // This instance does not exist on the MoonBit side yet; disconnectedCallback must not throw
   @dom.probe_disconnect(id)
   assert_eq(@dom.instance_reaction_log(id), [])
 }
@@ -195,7 +188,6 @@ test "adapter: light mode builds no shadow root and scopes styles to the tag nam
   )
   let id = @dom.probe_create("x-light-card")
   @dom.probe_connect(id)
-  // No shadow root
   assert_eq(@dom.probe_shadow_html(id), "")
   // :host is replaced by the tag name; plain selectors get the tag name prefix
   inspect(
@@ -225,7 +217,6 @@ test "adapter: shadow mode injects styles as is and leaves :host untouched" {
     @dom.probe_shadow_html(id),
     content="<style>:host { display: block } p { color: red }</style><p>?</p>",
   )
-  // Content lives in the shadow root; the element itself is empty
   assert_eq(@dom.probe_inner_html(id), "")
 }
 

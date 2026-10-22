@@ -1,8 +1,5 @@
 ///|
-/// Black-box tests for rendering.
-///
-/// Inline snapshots (`inspect(..., content=...)`) pin the output: rendering must be
-/// deterministic.
+/// Black-box tests for rendering, pinning the output with inline snapshots.
 /// Refresh snapshots: `moon test --update`.
 
 ///|

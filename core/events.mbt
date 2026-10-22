@@ -1,11 +1,7 @@
 ///|
-/// Description of an event a component dispatches.
-///
-/// The three fields map directly to the `CustomEvent` init options:
-/// - `bubbles`: whether the event bubbles to ancestors
-/// - `composed`: whether the event crosses the shadow boundary. For the host page to
-///   receive an event thrown inside the component, it must be `composed = true`;
-///   otherwise the shadow root stops it.
+/// Description of an event a component dispatches. The fields map to `CustomEvent` init
+/// options; a host page only receives an event thrown inside the component when it is
+/// `composed = true`, otherwise the shadow root stops it.
 pub struct EventSpec {
   name : String
   bubbles : Bool
@@ -22,16 +18,14 @@ pub fn EventSpec::new(
 }
 
 ///|
-/// An event for internal use that must cross the shadow boundary to the host page
-/// (bubbles and composed both true).
+/// Bubbles and crosses the shadow boundary (`bubbles` and `composed` are both true).
 pub fn EventSpec::crossing(name : String) -> EventSpec {
   { name, bubbles: true, composed: true, }
 }
 
 ///|
-/// An event used only inside the component (does not bubble, does not cross the shadow
-/// boundary).
-/// Named `contained` rather than `local`: `local` is a MoonBit reserved word.
+/// Does not bubble and does not cross the shadow boundary. Named `contained` because
+/// `local` is a MoonBit reserved word.
 pub fn EventSpec::contained(name : String) -> EventSpec {
   { name, bubbles: false, composed: false, }
 }
@@ -52,8 +46,8 @@ pub fn EventSpec::composed(self : EventSpec) -> Bool {
 }
 
 ///|
-/// Whether an event name is valid: non-empty, with no ASCII whitespace (a name
-/// containing a space is dispatched to nobody).
+/// Valid event name: non-empty with no ASCII whitespace (a spaced name is dispatched to
+/// nobody).
 pub fn is_valid_event_name(name : String) -> Bool {
   let n = name.char_length()
   if n == 0 {
@@ -77,10 +71,8 @@ pub fn is_valid_event_name(name : String) -> Bool {
 }
 
 ///|
-/// The set of events a component declares.
-///
-/// Duplicate and invalid names are rejected at registration time, rather than
-/// surfacing at dispatch time as an event nobody receives.
+/// The set of events a component declares. Duplicate and invalid names are rejected at
+/// registration time.
 pub struct EventRegistry {
   specs : Array[EventSpec]
 }
@@ -91,8 +83,7 @@ pub fn EventRegistry::new() -> EventRegistry {
 }
 
 ///|
-/// Register an event. `false` means it was rejected: the name is invalid, or it
-/// duplicates an already registered one.
+/// Register an event; `false` means the name is invalid or already registered.
 pub fn EventRegistry::add(self : EventRegistry, spec : EventSpec) -> Bool {
   if !is_valid_event_name(spec.name()) {
     return false

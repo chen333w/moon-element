@@ -5,8 +5,7 @@
 <meta name="viewport" content="width=device-width, initial-scale=1" />
 <title>moon-element demo · standard Web Components in MoonBit</title>
 <style>
-  /* Page styles. If these selectors leaked into the components they would change how
-     the components look; shadow DOM keeps them out. */
+  /* Page styles; shadow DOM keeps them out of the components. */
   body { font: 15px/1.6 system-ui, -apple-system, "Helvetica Neue", sans-serif;
          margin: 0; padding: 32px; color: #1c2330; background: #f6f8fb; }
   h1 { font-size: 22px; margin: 0 0 6px; }
@@ -25,8 +24,8 @@
          color: #cbd5e1; border-radius: 10px; padding: 12px; min-height: 92px; white-space: pre-wrap; }
   .err { background: #ffe9e9; border: 1px solid #ffc9c9; color: #8f1d1d; padding: 12px;
          border-radius: 10px; margin-bottom: 16px; }
-  /* No !important here. Shadow DOM blocks page rules structurally; light DOM isolation
-     only raises specificity through a selector prefix, so a page !important still wins. */
+  /* No !important here: shadow DOM blocks page rules structurally, light DOM only
+     raises specificity, so a page !important would still win. */
   .pill { background: hotpink; color: #fff; padding: 6px 10px;
           border-radius: 999px; font-size: 13px; }
   span { letter-spacing: .3em; }
@@ -128,7 +127,7 @@
     }
 
     try {
-      // Build artifact produced by `moon build --target js --release` at the repo root.
+      // Built by `moon build --target js --release` at the repo root.
       await import("../../_build/js/release/build/examples/demo/demo.js");
     } catch (e) {
       const box = document.getElementById("boot-error");

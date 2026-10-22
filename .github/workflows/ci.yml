@@ -1,6 +1,5 @@
-# CI gate for the MoonBit project.
-# Structure follows moonbit-community/starter check.yml; action versions are pinned
-# to commit SHAs so upstream tag moves cannot affect the build.
+# CI gate for the MoonBit project. Structure follows moonbit-community/starter check.yml;
+# action versions are pinned to commit SHAs.
 name: ci
 
 on:
@@ -48,8 +47,7 @@ jobs:
       - name: Check all backends
         run: moon check --target all --deny-warn
 
-      # Public interfaces (.mbti) must match the sources and be committed, guarding
-      # against interface drift.
+      # Public interfaces (.mbti) must match the sources and be committed.
       - name: Check public interfaces
         run: |
           moon info --target all
@@ -59,8 +57,7 @@ jobs:
       - name: Test all backends
         run: moon test --target all --deny-warn
 
-      # Generator drift check: the committed examples must match current CLI output
-      # exactly.
+      # Generator drift check: committed examples must match current CLI output.
       - name: "CLI: generated skeleton matches committed example"
         run: |
           moon run cmd/main -- x-counter > /tmp/generated-component.mbt
@@ -68,14 +65,12 @@ jobs:
           moon run cmd/main -- x-light-panel --mode light > /tmp/generated-light.mbt
           diff -u examples/generated-light-panel/component.mbt /tmp/generated-light.mbt
 
-      # Build the demo artifact and verify it headlessly under node.
       - name: Build demo and verify the artifact headlessly
         run: |
           moon build --target js --release
           node examples/demo/verify.mjs
 
-      # Coverage is informational; the CLI entry point and example run paths are
-      # outside unit-test coverage.
+      # Informational: the CLI entry point and example run paths are not unit-tested.
       - name: Coverage (js, informational)
         run: |
           moon test --target js --enable-coverage

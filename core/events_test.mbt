@@ -31,10 +31,8 @@ test "EventRegistry: register, deduplicate, reject invalid names" {
   assert_true(reg.add(@core.EventSpec::crossing("count-changed")))
   assert_true(reg.add(@core.EventSpec::contained("internal-step")))
   assert_eq(reg.names(), ["count-changed", "internal-step"])
-  // duplicate name is rejected
   assert_false(reg.add(@core.EventSpec::contained("count-changed")))
   assert_eq(reg.length(), 2)
-  // invalid name is rejected
   assert_false(reg.add(@core.EventSpec::contained("bad name")))
   assert_eq(reg.length(), 2)
 }

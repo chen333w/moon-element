@@ -1,18 +1,9 @@
 ///|
-/// Event dispatch: maps `core` event specs onto the browser `CustomEvent`.
-///
-/// As with attribute reflection, the rules live in `core` (event name validation,
-/// registry, bubbles/composed semantics); this file only does wiring and logging.
+/// Event dispatch: `core` event specs onto the browser `CustomEvent`.
 
 ///|
-/// Dispatch a custom event.
-///
-/// - a name in this instance's event registry dispatches with its declared
-///   `bubbles` / `composed`
-/// - undeclared names still dispatch, with conservative defaults (no bubbling, no
-///   shadow boundary crossing), so a missing declaration cannot leak an event out
-/// - returns `true` when a listener called `preventDefault()`
-/// - an invalid instance id returns `false` and does not throw
+/// Undeclared names still dispatch, with conservative defaults (no bubbling, no
+/// shadow boundary crossing).
 pub fn dispatch(
   id : Int32,
   event_name : String,
@@ -45,7 +36,6 @@ pub fn dispatch(
 }
 
 ///|
-/// Log of dispatched events, for diagnostics and tests.
 pub fn instance_event_log(id : Int32) -> Array[String] {
   match instance_get(id) {
     Some(inst) => inst.event_log
@@ -54,7 +44,6 @@ pub fn instance_event_log(id : Int32) -> Array[String] {
 }
 
 ///|
-/// Event names declared on this instance, for diagnostics and tests.
 pub fn instance_event_names(id : Int32) -> Array[String] {
   match instance_get(id) {
     Some(inst) => inst.event_registry.names()
@@ -88,12 +77,9 @@ extern "js" fn js_dispatch(
   #|  return !notCanceled;
   #|}
 
-// ---------------------------------------------------------------------------
 // Test probes: simulate listeners headlessly
-// ---------------------------------------------------------------------------
 
 ///|
-/// Probe: add a recording listener to an instance (logs event name, detail, bubbles, composed).
 pub extern "js" fn probe_add_listener(id : Int32, event_name : String) -> Unit =
   #|(id, name) => {
   #|  const reg = globalThis.__moon_element_instances;
@@ -121,7 +107,6 @@ pub extern "js" fn probe_add_listener(id : Int32, event_name : String) -> Unit =
   #|}
 
 ///|
-/// Probe: add a listener that calls `preventDefault()`.
 pub extern "js" fn probe_add_canceling_listener(
   id : Int32,
   event_name : String,
@@ -138,7 +123,6 @@ pub extern "js" fn probe_add_canceling_listener(
   #|}
 
 ///|
-/// Probe: read the events a recording listener received.
 pub fn probe_listener_log(id : Int32) -> Array[String] {
   let out : Array[String] = []
   for line in js_probe_listener_log(id) {

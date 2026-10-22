@@ -1,11 +1,7 @@
 ///|
-/// The demo's four components: attribute reflection with a fallback for invalid values,
-/// shadow DOM style isolation, HTML escaping, and events dispatched to the page.
-///
-/// Data flows one way: the page sets an attribute, the component re-renders and emits an
-/// event, the page receives it. Components attach no DOM listeners of their own
-/// (re-rendering replaces innerHTML and would drop them), so the demo's buttons live in
-/// the page (light DOM) instead.
+/// The demo's four components: attribute reflection with fallback, shadow DOM isolation,
+/// HTML escaping, and events dispatched to the page. Components attach no DOM listeners
+/// (re-rendering replaces innerHTML), so the page owns the buttons.
 
 ///|
 const COUNTER_CSS : String =
@@ -104,8 +100,8 @@ fn card_view(props : @core.Props) -> @core.View {
 }
 
 ///|
-/// A light DOM component writes its styles against `:host`; the adapter rewrites them
-/// with `core.scope_css` to `x-panel ...`, so they cannot leak into the page.
+/// Styles are written against `:host`; the adapter rewrites them with `core.scope_css`
+/// to `x-panel ...`, so they cannot leak into the page.
 const PANEL_CSS : String =
   #|:host { display: block; margin-top: 8px; }
   #|.panel-title { font-weight: 600; color: #12457f; }
@@ -132,7 +128,7 @@ fn panel_view(props : @core.Props) -> @core.View {
 }
 
 ///|
-/// Registers the four components; each `on_change` hook dispatches its outward event.
+/// Registers the four demo components.
 pub fn register_demo() -> Unit {
   @dom.define_component(
     "x-counter",
@@ -171,7 +167,6 @@ pub fn register_demo() -> Unit {
     card_view,
     styles=CARD_CSS,
   )
-  // Light DOM mode: core.scope_css scopes the styles to the tag name.
   @dom.define_component(
     "x-panel",
     [

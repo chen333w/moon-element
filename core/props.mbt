@@ -1,17 +1,12 @@
 ///|
-/// The current values of a group of attributes.
-///
-/// `Props` is the runtime-state half of attribute reflection: it keeps `specs` (the
-/// specification, shareable between instances) apart from `values` (one set per
-/// instance), so two instances cannot pollute each other. Fallback semantics match
-/// `AttrSpec::parse` exactly: missing or invalid → the default.
+/// The current values of a group of attributes. `specs` is shareable between instances
+/// while `values` is one set per instance; missing or invalid falls back to the default.
 pub struct Props {
   specs : Array[AttrSpec]
   values : Array[AttrValue]
 }
 
 ///|
-/// Build a value set from the specs, all initialized to their defaults.
 pub fn Props::new(specs : Array[AttrSpec]) -> Props {
   let values : Array[AttrValue] = []
   for spec in specs {
@@ -21,12 +16,8 @@ pub fn Props::new(specs : Array[AttrSpec]) -> Props {
 }
 
 ///|
-/// Apply one attribute change: `None` means the attribute was removed → fall back to the
-/// default.
-///
-/// `false` means the attribute name is not in the specs (not observed), in which case no
-/// value changes. Browsers only call back for observed attributes; the return value is
-/// for defensive checks and debugging.
+/// Apply one attribute change; `None` means the attribute was removed. `false` means the
+/// name is not in the specs, and no value changes.
 pub fn Props::apply(self : Props, attr_name : String, raw : String?) -> Bool {
   let mut i = 0
   while i < self.specs.length() {
@@ -52,9 +43,8 @@ pub fn Props::get(self : Props, attr_name : String) -> AttrValue? {
 }
 
 ///|
-/// Read a string value by attribute name; returns `None` on a **type mismatch** or a
-/// missing attribute. There is no implicit conversion, so numeric attributes such as
-/// `max-count` are never quietly read as strings.
+/// Read a string value; `None` on type mismatch or a missing attribute. No implicit
+/// conversion.
 pub fn Props::get_string(self : Props, attr_name : String) -> String? {
   match self.get(attr_name) {
     Some(VString(s)) => Some(s)
@@ -87,7 +77,7 @@ pub fn Props::get_bool(self : Props, attr_name : String) -> Bool? {
 }
 
 ///|
-/// The attribute names in the specs, in `specs` order, for debugging and snapshots.
+/// Attribute names in `specs` order.
 pub fn Props::keys(self : Props) -> Array[String] {
   let out : Array[String] = []
   for spec in self.specs {

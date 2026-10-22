@@ -1,27 +1,20 @@
 ///|
-/// Lifecycle state of a custom element.
-///
-/// As in the DOM spec, the connected state is a boolean: an element removed from the
-/// document returns to `Unconnected` and is indistinguishable from one that was never
-/// connected. Counts and the reaction log keep the history.
+/// Lifecycle state of a custom element. As in the DOM spec this is a boolean: a removed
+/// element is indistinguishable from one that was never connected.
 pub(all) enum LifecycleState {
   Unconnected
   Connected
 } derive(Eq, @debug.Debug)
 
 ///|
-/// Declare explicitly to silence the deprecation warning for implicitly promoted derived methods.
 pub extend LifecycleState with Eq::{equal, not_equal}
 
 ///|
-/// Declare explicitly to silence the deprecation warning for implicitly promoted derived methods.
 pub extend LifecycleState with @debug.Debug::{to_repr}
 
 ///|
-/// A lifecycle reaction (custom element reactions in the spec).
-///
-/// The `React` constructor prefix avoids clashing with the same-named `LifecycleState`
-/// constructors.
+/// A lifecycle reaction (custom element reactions in the spec). The `React` prefix avoids
+/// clashing with the same-named `LifecycleState` constructors.
 pub(all) enum Reaction {
   ReactConnected
   ReactDisconnected
@@ -30,15 +23,11 @@ pub(all) enum Reaction {
 } derive(@debug.Debug)
 
 ///|
-/// Declare `Debug` explicitly to silence the deprecation warning for implicit promotion.
 pub extend Reaction with @debug.Debug::{to_repr}
 
 ///|
-/// The lifecycle state machine plus its reaction log.
-///
-/// This structure **never touches the DOM**: the adapter layer turns browser callbacks
-/// into the calls below. The rules are therefore verifiable with plain unit tests on
-/// every backend, no browser required.
+/// The lifecycle state machine plus its reaction log. It never touches the DOM; the
+/// adapter layer turns browser callbacks into these calls.
 pub struct Lifecycle {
   mut state : LifecycleState
   mut connect_count : Int32
@@ -53,10 +42,8 @@ pub fn Lifecycle::new() -> Lifecycle {
 }
 
 ///|
-/// The element was inserted into the document.
-///
-/// An already connected element produces no reaction (per spec, "if the element is
-/// connected, do nothing"); `false` means no reaction was produced this time.
+/// The element was inserted into the document. An already connected element produces no
+/// reaction (per spec); `false` means no reaction happened this time.
 pub fn Lifecycle::on_connect(self : Lifecycle) -> Bool {
   if self.state == Connected {
     false
@@ -82,11 +69,8 @@ pub fn Lifecycle::on_disconnect(self : Lifecycle) -> Bool {
 }
 
 ///|
-/// An attribute changed.
-///
-/// Per spec the change is recorded whether or not the element is connected. Filtering
-/// out unobserved attributes is the adapter's job, using `observed_attributes`; this
-/// structure does not filter, so the trace stays complete.
+/// An attribute changed. Per spec the change is recorded whether or not the element is
+/// connected; filtering unobserved attributes is the adapter's job.
 pub fn Lifecycle::on_attribute_changed(
   self : Lifecycle,
   attr_name : String,
@@ -128,16 +112,8 @@ pub fn Lifecycle::reaction_count(self : Lifecycle) -> Int32 {
 }
 
 ///|
-/// Convert the reaction sequence into a stable string sequence, for assertions and
-/// snapshots:
-///
-/// ```text
-/// connected
-/// disconnected
-/// attribute:max-count:1->2
-/// attribute:max-count:<none>->2     // old value is none when the attribute is added
-/// adopted
-/// ```
+/// The reaction sequence as stable strings, for assertions and snapshots, e.g.
+/// `attribute:max-count:1->2` with `<none>` for a missing old value.
 pub fn Lifecycle::reaction_log(self : Lifecycle) -> Array[String] {
   let out : Array[String] = []
   for r in self.reactions {

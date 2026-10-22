@@ -1,32 +1,21 @@
 ///|
-/// How a component renders.
-///
-/// Lives in `core` rather than `dom` because it belongs to the **component model**:
-/// core decides what is rendered and how styles are handled, dom only decides where the
-/// output goes. That also lets the CLI and config use it directly as a parameter type.
-///
-/// - `ShadowDom` (default): renders into a shadow root, styles are isolated by
-///   construction, and `:host` works as is
-/// - `LightDom`: renders into the element itself (no shadow root). The component CSS is
-///   first scoped to the tag name with `scope_css`, so it cannot leak into the page
+/// How a component renders. `ShadowDom` renders into a shadow root, where `:host` works as
+/// is; `LightDom` renders into the element itself and first scopes the component CSS to
+/// the tag name with `scope_css`.
 pub(all) enum RenderMode {
   ShadowDom
   LightDom
 } derive(Eq, @debug.Debug)
 
 ///|
-/// `derive` produces these as implicitly promoted methods (deprecated); declare them
-/// explicitly to silence the warning.
 pub extend RenderMode with Eq::{equal, not_equal}
 
 ///|
 pub extend RenderMode with @debug.Debug::{to_repr}
 
 ///|
-/// Parse a mode name (used by the CLI and config).
-///
-/// Only `"shadow"` and `"light"` are accepted; anything else returns `None`. No fuzzy
-/// matching, so a misspelled value is never silently taken as the default.
+/// Parse a mode name. Only `"shadow"` and `"light"` are accepted; anything else returns
+/// `None`, so a misspelled value is never silently taken as the default.
 pub fn RenderMode::parse(s : String) -> RenderMode? {
   if s == "shadow" {
     Some(ShadowDom)
