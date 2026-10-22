@@ -9,7 +9,7 @@
 （原生 HTML / React / Vue / 任何能写标签的地方），**不需要引入 MoonBit 侧的前端框架运行时**。
 
 > 状态：**核心可用**（2026-10-22）
-> CI 全绿 · 测试 wasm/wasm-gc/native **61/61**、js **82/82** · 库本体行覆盖 **96.2%**
+> CI 全绿 · 测试 wasm/wasm-gc/native **61/61**、js **85/85** · 库本体行覆盖 **96.3%**
 > （数字为 2026-10-22 快照，复现命令见下文；提交记录连续、数量 ≥10，不写死以免每次提交都漂）
 
 ## 为什么不是「又一个前端框架」
@@ -29,8 +29,9 @@
 | 属性名映射 | `max-count` ↔ `maxCount` 双向转换，MoonBit 侧名字由属性名推导，杜绝两处不一致 |
 | 生命周期 | 连接 / 断开 / 属性变化 / adoptedCallback 状态机；重复连接不重复触发；断开后可重连 |
 | 渲染 | `View` 树 → HTML 字符串；文本与属性值**默认转义**；void 元素不加闭合标签；输出确定性（可快照） |
-| shadow DOM | 渲染结果写进 shadow root，样式天然隔离 |
-| CSS 作用域 | `scope_css(css, scope)` 把 `:host` 样式表改写成前缀形式，供**不能上 shadow DOM** 的场合使用 |
+| 渲染模式 | `mode` 选 **shadow DOM**（默认，`:host` 直接可用）或 **light DOM**（不建 shadow root，样式用 `scope_css` 作用域到标签名）|
+| 样式声明 | `styles` 只写一次组件 CSS：shadow 模式原样注入，light 模式自动加作用域前缀 |
+| CSS 作用域 | `scope_css(css, scope)` 把 `:host` 样式表改写成前缀形式；light DOM 模式就是用它做隔离 |
 | 事件 | 声明式事件规格（`crossing` = `bubbles + composed`，可穿 shadow 边界到宿主页面）；`on_change` 回调里 `dispatch` 即可对外抛事件 |
 | CLI | `moon run cmd/main -- x-counter` 生成组件骨架；元素名按 HTML 规范校验 |
 
@@ -83,7 +84,7 @@ open http://localhost:8000/examples/demo/
 不想开浏览器也可以验证运行时行为（加载的是**构建产物本身**）：
 
 ```bash
-node examples/demo/verify.mjs        # 11 项断言
+node examples/demo/verify.mjs        # 16 项断言
 ```
 
 ## 命令
@@ -112,13 +113,13 @@ cmd/main/          CLI
 
 ## 测试与质量
 
-- **四后端单元测试**：61/61（wasm、wasm-gc、native）+ 82/82（js）
+- **四后端单元测试**：61/61（wasm、wasm-gc、native）+ 85/85（js）
 - **无浏览器也能测 DOM 行为**：`install_dom_stub()` 提供一个最小 DOM 桩（含 `attachShadow`、
   `CustomEvent`、事件派发），因此适配层逻辑在 node 下就能测，**不引入 jsdom/happy-dom 等 npm 依赖**
-- **产物级验证**：`examples/demo/verify.mjs` 直接 import 构建产物（浏览器加载的同一份文件）跑断言
+- **产物级验证**：`examples/demo/verify.mjs` 直接 import 构建产物（浏览器加载的同一份文件）跑 **16 项断言**
 - **生成器漂移检查**：仓库里的示例必须与 CLI 当前产出逐字节一致，忘了重新生成 CI 就会红
 - **接口漂移检查**：`moon info` 后校验 `.mbti` 无 diff、无未提交接口文件
-- **覆盖率**：库本体（`core` + `dom`）行覆盖 **96.2%**（640/665）；计入 CLI 入口与 demo 的整仓数字为 84.9%（640/754）——后两者是集成路径，由「构建产物验证 + 生成器漂移检查 + CI 编译」覆盖，不计入单元测试分母
+- **覆盖率**：库本体（`core` + `dom`）行覆盖 **96.3%**（650/675）；计入 CLI 入口与 demo 的整仓数字为 83.8%（650/776）——后两者是集成路径，由「构建产物验证 + 生成器漂移检查 + CI 编译」覆盖，不计入单元测试分母
 
 ## 已知限制
 
@@ -134,7 +135,7 @@ cmd/main/          CLI
 3. ~~渲染 + CSS 作用域（快照测试）~~
 4. ~~DOM 适配层（注册 / 属性回调 / shadow 渲染）~~
 5. ~~事件系统 + 骨架生成器 CLI~~
-6. ~~demo 页（3 个组件）~~ + 发布到 mooncakes.io
+6. ~~demo 页（4 个组件，含 light DOM 模式）~~ + 发布到 mooncakes.io
 7. 下一步：逐元素 diff、组件内部事件、`moon test --target js` 的 DOM 夹具
 
 ## 许可证

@@ -8,6 +8,33 @@
 /// 这里只需要测「接线是否接对了」。
 
 ///|
+/// 渲染模式。
+///
+/// - `ShadowDom`（默认）：渲染进 shadow root，样式天然隔离，`:host` 直接可用
+/// - `LightDom`：渲染进元素自身（不建 shadow root）。此时组件 CSS 会先用
+///   `core.scope_css` 作用域到标签名，避免污染整页 —— 用于 SSR 输出，
+///   或需要宿主页面样式透入的场合
+pub(all) enum RenderMode {
+  ShadowDom
+  LightDom
+} derive(Eq)
+
+///|
+/// `derive(Eq)` 生成的方法默认会被隐式提升为普通方法（已废弃行为），显式声明以消除警告。
+pub extend RenderMode with Eq::{equal, not_equal}
+
+///|
+/// 一个已注册组件的静态定义（同 tag 的所有实例共享）。
+priv struct ComponentDef {
+  tag : String
+  specs : Array[@core.AttrSpec]
+  render_fn : (@core.Props) -> @core.View
+  events : Array[@core.EventSpec]
+  styles : String
+  mode : RenderMode
+}
+
+///|
 /// 一个元素实例在 MoonBit 侧的状态。
 priv struct Instance {
   props : @core.Props
@@ -16,6 +43,10 @@ priv struct Instance {
   event_registry : @core.EventRegistry
   // 派发过的事件记录（诊断与测试用）："name:detail:canceled"
   event_log : Array[String]
+  // 渲染时需要：light 模式下作为 scope_css 的作用域
+  tag : String
+  styles : String
+  mode : RenderMode
 }
 
 ///|
@@ -45,25 +76,23 @@ fn instance_put(id : Int32, inst : Instance) -> Unit {
 }
 
 ///|
-fn ensure_instance(
-  id : Int32,
-  specs : Array[@core.AttrSpec],
-  render_fn : (@core.Props) -> @core.View,
-  events : Array[@core.EventSpec],
-) -> Instance {
+fn ensure_instance(id : Int32, def : ComponentDef) -> Instance {
   match instance_get(id) {
     Some(inst) => inst
     None => {
       let event_registry = @core.EventRegistry::new()
-      for spec in events {
+      for spec in def.events {
         let _ = event_registry.add(spec)
       }
       let inst : Instance = {
-        props: @core.Props::new(specs),
+        props: @core.Props::new(def.specs),
         lifecycle: @core.Lifecycle::new(),
-        render_fn,
+        render_fn: def.render_fn,
         event_registry,
         event_log: [],
+        tag: def.tag,
+        styles: def.styles,
+        mode: def.mode,
       }
       instance_put(id, inst)
       inst
@@ -76,8 +105,22 @@ fn paint(id : Int32) -> Unit {
   match instance_get(id) {
     Some(inst) => {
       let render_fn = inst.render_fn
-      let html = @core.render(render_fn(inst.props))
-      js_set_shadow_html(id, html)
+      let body = @core.render(render_fn(inst.props))
+      let html = if inst.styles == "" {
+        body
+      } else {
+        // light 模式下组件的 CSS 会泄漏到整页，先用 scope_css 作用域到标签名；
+        // shadow 模式保持原样（`:host` 在 shadow root 里才是有效的）
+        let css = match inst.mode {
+          ShadowDom => inst.styles
+          LightDom => @core.scope_css(inst.styles, inst.tag)
+        }
+        "<style>" + css + "</style>" + body
+      }
+      match inst.mode {
+        ShadowDom => js_set_shadow_html(id, html)
+        LightDom => js_set_inner_html(id, html)
+      }
     }
     None => ()
   }
@@ -95,13 +138,24 @@ fn paint(id : Int32) -> Unit {
 /// - `on_change` 在每次被观察属性变化、且状态更新完毕（含重渲染）之后被调用，
 ///   参数是 (实例 id, 属性名)。这是组件对外派发事件的入口：在回调里调用 `dispatch`，
 ///   避免让用户自己去猜实例 id
+/// - `styles` 是组件的 CSS，只写一次：shadow 模式下原样注入（`:host` 可用），
+///   light 模式下先用 `scope_css` 作用域到标签名再注入
+/// - `mode` 选 shadow DOM（默认）还是 light DOM；light 模式适合 SSR 输出或
+///   需要宿主样式透入的场合
 pub fn define_component(
   tag : String,
   specs : Array[@core.AttrSpec],
   render_fn : (@core.Props) -> @core.View,
   events~ : Array[@core.EventSpec] = [],
   on_change~ : (Int32, String) -> Unit = fn(_id, _name) { () },
+  styles~ : String = "",
+  mode~ : RenderMode = ShadowDom,
 ) -> Unit {
+  let def : ComponentDef = { tag, specs, render_fn, events, styles, mode, }
+  let use_shadow = match mode {
+    ShadowDom => true
+    LightDom => false
+  }
   // FixedArray 是定长数组（没有 push），先分配再按下标写入
   let observed : FixedArray[String] = FixedArray::make(specs.length(), "")
   let mut oi = 0
@@ -110,7 +164,7 @@ pub fn define_component(
     oi = oi + 1
   }
   let on_connected : (Int32) -> Unit = fn(id) {
-    let inst = ensure_instance(id, specs, render_fn, events)
+    let inst = ensure_instance(id, def)
     if inst.lifecycle.on_connect() {
       instance_put(id, inst)
       paint(id)
@@ -132,7 +186,7 @@ pub fn define_component(
     has_new,
     new_value,
   ) {
-    let inst = ensure_instance(id, specs, render_fn, events)
+    let inst = ensure_instance(id, def)
     let old_opt : String? = if had_old { Some(old_value) } else { None }
     let new_opt : String? = if has_new { Some(new_value) } else { None }
     inst.lifecycle.on_attribute_changed(name, old_opt, new_opt)
@@ -145,7 +199,9 @@ pub fn define_component(
     // 状态与 DOM 都更新完了再通知调用方，这样回调里读到的是一致的状态
     on_change(id, name)
   }
-  js_define(tag, observed, on_connected, on_disconnected, on_attribute)
+  js_define(
+    tag, observed, on_connected, on_disconnected, on_attribute, use_shadow,
+  )
 }
 
 ///|
@@ -201,8 +257,9 @@ extern "js" fn js_define(
   on_connected : (Int32) -> Unit,
   on_disconnected : (Int32) -> Unit,
   on_attribute : (Int32, String, Bool, String, Bool, String) -> Unit,
+  use_shadow : Bool,
 ) -> Unit =
-  #|(tag, observed, onConnected, onDisconnected, onAttribute) => {
+  #|(tag, observed, onConnected, onDisconnected, onAttribute, useShadow) => {
   #|  const reg =
   #|    globalThis.__moon_element_instances ||
   #|    (globalThis.__moon_element_instances = {
@@ -221,7 +278,8 @@ extern "js" fn js_define(
   #|      return observed;
   #|    }
   #|    connectedCallback() {
-  #|      if (!this.shadowRoot) {
+  #|      // light 模式下不建 shadow root：内容直接写进元素自身
+  #|      if (useShadow && !this.shadowRoot) {
   #|        this.attachShadow({ mode: "open" });
   #|      }
   #|      onConnected(this.__moonId);
@@ -260,6 +318,26 @@ extern "js" fn js_set_shadow_html(id : Int32, html : String) -> Unit =
   #|  if (el && el.shadowRoot) {
   #|    el.shadowRoot.innerHTML = html;
   #|  }
+  #|}
+
+///|
+/// light 模式：把渲染结果写进元素自身（没有 shadow root）
+extern "js" fn js_set_inner_html(id : Int32, html : String) -> Unit =
+  #|(id, html) => {
+  #|  const reg = globalThis.__moon_element_instances;
+  #|  const el = reg && reg.byId[id];
+  #|  if (el) {
+  #|    el.innerHTML = html;
+  #|  }
+  #|}
+
+///|
+/// 探针：元素自身的 innerHTML（light 模式下用它断言；shadow 模式下为空）
+pub extern "js" fn probe_inner_html(id : Int32) -> String =
+  #|(id) => {
+  #|  const reg = globalThis.__moon_element_instances;
+  #|  const el = reg && reg.byId[id];
+  #|  return el ? el.innerHTML || "" : "";
   #|}
 
 ///|

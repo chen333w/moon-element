@@ -98,8 +98,8 @@ check("构建产物可以被 ES 模块方式加载并执行", importError === nu
 
 const registry = globalThis.__stubRegistry || {};
 check(
-  "加载后三个自定义元素都已注册",
-  ["x-counter", "x-badge", "x-card"].every((t) => typeof registry[t] === "function"),
+  "加载后四个自定义元素都已注册",
+  ["x-counter", "x-badge", "x-card", "x-panel"].every((t) => typeof registry[t] === "function"),
   Object.keys(registry).join(","),
 );
 
@@ -161,6 +161,29 @@ if (typeof registry["x-counter"] === "function") {
   // 反转义由浏览器负责；这里只确认保留的是转义文本
   k.attributeChangedCallback("body", "B", "<i>x</i>");
   check("卡片正文同样走转义", k.shadowRoot.innerHTML.includes("&lt;i&gt;x&lt;/i&gt;"));
+}
+
+// —— x-panel：light DOM 模式（没有 shadow root，样式被 scope_css 作用域到标签名）——
+if (typeof registry["x-panel"] === "function") {
+  const panel = new registry["x-panel"]();
+  panel.connectedCallback();
+  check("light 模式不创建 shadow root", !panel.shadowRoot);
+  check(
+    "light 模式的内容写在元素自身",
+    panel.innerHTML.includes("panel-title"),
+    panel.innerHTML.slice(0, 120),
+  );
+  check(
+    "样式被 scope_css 作用域到标签名（:host 变成 x-panel）",
+    panel.innerHTML.includes("x-panel { display: block; margin-top: 8px; }") &&
+      !panel.innerHTML.includes(":host"),
+  );
+  check(
+    "普通选择器也加了标签名前缀（不会污染页面的 .pill）",
+    panel.innerHTML.includes("x-panel .pill { background: #eef2f7; }"),
+  );
+  panel.attributeChangedCallback("body", null, "更新");
+  check("light 模式属性变化同样重渲染", panel.innerHTML.includes("更新"));
 }
 
 console.log(`\n通过 ${passed}，失败 ${failed}`);

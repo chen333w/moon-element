@@ -176,3 +176,69 @@ test "adapter: 未连接就断开（元素已创建但从未触发过回调）�
   @dom.probe_disconnect(id)
   assert_eq(@dom.instance_reaction_log(id), [])
 }
+
+///|
+fn render_light(props : @core.Props) -> @core.View {
+  @core.View::element("p", [], [
+    @core.View::text(props.get_string("label").unwrap_or("?")),
+  ])
+}
+
+///|
+test "adapter: light 模式不建 shadow root，并用 scope_css 把样式作用域到标签名" {
+  @dom.install_dom_stub()
+  @dom.define_component(
+    "x-light-card",
+    [@core.AttrSpec::string("label", "?")],
+    render_light,
+    styles=":host { display: block } p { color: red }",
+    mode=@dom.LightDom,
+  )
+  let id = @dom.probe_create("x-light-card")
+  @dom.probe_connect(id)
+  // 没有 shadow root
+  assert_eq(@dom.probe_shadow_html(id), "")
+  // :host 被替换为标签名，普通选择器加上标签名前缀 —— 这就是 core.scope_css 的产出
+  inspect(
+    @dom.probe_inner_html(id),
+    content="<style>x-light-card { display: block } x-light-card p { color: red }</style><p>?</p>",
+  )
+  // 属性变化重渲染时作用域前缀保持稳定
+  @dom.probe_set_attribute(id, "label", "hi")
+  inspect(
+    @dom.probe_inner_html(id),
+    content="<style>x-light-card { display: block } x-light-card p { color: red }</style><p>hi</p>",
+  )
+}
+
+///|
+test "adapter: shadow 模式样式原样注入，:host 保持不动" {
+  @dom.install_dom_stub()
+  @dom.define_component(
+    "x-shadow-card",
+    [@core.AttrSpec::string("label", "?")],
+    render_light,
+    styles=":host { display: block } p { color: red }",
+  )
+  let id = @dom.probe_create("x-shadow-card")
+  @dom.probe_connect(id)
+  inspect(
+    @dom.probe_shadow_html(id),
+    content="<style>:host { display: block } p { color: red }</style><p>?</p>",
+  )
+  // 内容在 shadow root 里，元素自身是空的
+  assert_eq(@dom.probe_inner_html(id), "")
+}
+
+///|
+test "adapter: 没写 styles 时不注入空 style 标签" {
+  @dom.install_dom_stub()
+  @dom.define_component(
+    "x-no-style",
+    [@core.AttrSpec::string("label", "?")],
+    render_light,
+  )
+  let id = @dom.probe_create("x-no-style")
+  @dom.probe_connect(id)
+  inspect(@dom.probe_shadow_html(id), content="<p>?</p>")
+}

@@ -6,7 +6,7 @@ import {
 }
 
 // Values
-pub fn define_component(String, Array[@core.AttrSpec], (@core.Props) -> @core.View, events? : Array[@core.EventSpec], on_change? : (Int32, String) -> Unit) -> Unit
+pub fn define_component(String, Array[@core.AttrSpec], (@core.Props) -> @core.View, events? : Array[@core.EventSpec], on_change? : (Int32, String) -> Unit, styles? : String, mode? : RenderMode) -> Unit
 
 pub fn define_element(String, () -> Unit) -> Unit
 
@@ -44,6 +44,8 @@ pub fn probe_create(String) -> Int32
 
 pub fn probe_disconnect(Int32) -> Unit
 
+pub fn probe_inner_html(Int32) -> String
+
 pub fn probe_listener_log(Int32) -> Array[String]
 
 pub fn probe_observed(String) -> Array[String]
@@ -57,6 +59,12 @@ pub fn probe_shadow_html(Int32) -> String
 // Errors
 
 // Types and methods
+pub(all) enum RenderMode {
+  ShadowDom
+  LightDom
+} derive(Eq)
+pub fn RenderMode::equal(Self, Self) -> Bool
+pub fn RenderMode::not_equal(Self, Self) -> Bool
 
 // Type aliases
 

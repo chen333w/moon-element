@@ -92,6 +92,21 @@
     </div>
   </section>
 
+  <section>
+    <h2>5 · 不用 shadow DOM 也能隔离（light DOM 模式）</h2>
+    <div class="row">
+      <x-panel title="SSR 友好的面板"
+               body="这个组件没有 shadow root：内容直接渲染在元素自身，样式由 core.scope_css 作用域到 x-panel。">
+      </x-panel>
+      <span class="pill">页面里的 .pill（被页面样式染成粉色）</span>
+    </div>
+    <p class="note">
+      对比很直观：组件里的 <code>.pill</code> 是浅灰底（选择器被改写成 <code>x-panel .pill</code>），
+      页面里的 <code>.pill</code> 仍是粉色。<strong>没有 shadow DOM 也做到了互不污染</strong>，
+      代价是选择器会被加前缀。适用于 SSR 输出、或需要宿主样式透入的场合。
+    </p>
+  </section>
+
   <script type="module">
     const logEl = document.getElementById("log");
     let seq = 0;
@@ -143,7 +158,11 @@
     document.getElementById("card-body").oninput = (e) => card.setAttribute("body", e.target.value);
     document.getElementById("card-tone").onchange = (e) => card.setAttribute("tone", e.target.value);
 
-    log("3 个组件已注册，事件监听已挂上");
+    const panel = document.querySelector("x-panel");
+    log(
+      `x-panel 有 shadowRoot 吗？${panel && panel.shadowRoot ? "有" : "没有（light DOM 模式）"}`,
+    );
+    log("4 个组件已注册，事件监听已挂上");
   </script>
 </body>
 </html>

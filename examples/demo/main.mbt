@@ -1,5 +1,5 @@
 ///|
-/// demo 用的三个组件。
+/// demo 用的四个组件。
 ///
 /// 这里不追求功能多，而是把库的关键能力都摆到台面上：
 /// 属性反射（含非法值回退）、shadow DOM 样式隔离、HTML 转义、组件对外派发事件。
@@ -10,7 +10,6 @@
 
 ///|
 const COUNTER_CSS : String =
-  #|<style>
   #|  :host { display: inline-block; }
   #|  .wrap { font: 14px/1.4 system-ui, sans-serif; border: 1px solid #d5dbe3;
   #|          border-radius: 10px; padding: 12px 14px; min-width: 160px; background: #fff; }
@@ -18,7 +17,6 @@ const COUNTER_CSS : String =
   #|  .num { font-size: 30px; font-weight: 650; color: #1f6feb; margin: 2px 0 8px; }
   #|  .bar { height: 6px; border-radius: 3px; background: #eaeef3; overflow: hidden; }
   #|  .bar > i { display: block; height: 100%; background: #1f6feb; }
-  #|</style>
 
 ///|
 fn counter_view(props : @core.Props) -> @core.View {
@@ -39,7 +37,6 @@ fn counter_view(props : @core.Props) -> @core.View {
     0
   }
   @core.View::fragment([
-    @core.View::raw(COUNTER_CSS),
     @core.View::element("div", [("class", "wrap")], [
       @core.View::element("div", [("class", "label")], [@core.View::text(label)]),
       @core.View::element("div", [("class", "num")], [
@@ -54,7 +51,6 @@ fn counter_view(props : @core.Props) -> @core.View {
 
 ///|
 const BADGE_CSS : String =
-  #|<style>
   #|  :host { display: inline-block; }
   #|  .pill { display: inline-block; font: 13px/1 system-ui, sans-serif;
   #|          padding: 6px 10px; border-radius: 999px; border: 1px solid transparent; }
@@ -62,7 +58,6 @@ const BADGE_CSS : String =
   #|  .warn { background: #fff3e0; color: #8a4b00; border-color: #ffd8a8; }
   #|  .danger { background: #ffe9e9; color: #8f1d1d; border-color: #ffc9c9; }
   #|  .plain { background: #f2f4f7; color: #3b4453; border-color: #dde2e9; }
-  #|</style>
 
 ///|
 fn tone_class(tone : String) -> String {
@@ -78,7 +73,6 @@ fn badge_view(props : @core.Props) -> @core.View {
   let label = props.get_string("label").unwrap_or("?")
   let tone = props.get_string("tone").unwrap_or("info")
   @core.View::fragment([
-    @core.View::raw(BADGE_CSS),
     @core.View::element("span", [("class", "pill \{tone_class(tone)}")], [
       // label 走 VText，会被转义——页面传 <b>hi</b> 时看到的是字面文本
       @core.View::text(label),
@@ -88,14 +82,12 @@ fn badge_view(props : @core.Props) -> @core.View {
 
 ///|
 const CARD_CSS : String =
-  #|<style>
   #|  :host { display: block; }
   #|  .card { font: 14px/1.6 system-ui, sans-serif; border: 1px solid #d5dbe3;
   #|          border-radius: 12px; overflow: hidden; background: #fff; }
   #|  .hd { padding: 10px 14px; font-weight: 600; background: #f7f9fc; }
   #|  .hd.warn { background: #fff8ec; color: #8a4b00; }
   #|  .bd { padding: 12px 14px; color: #3b4453; }
-  #|</style>
 
 ///|
 fn card_view(props : @core.Props) -> @core.View {
@@ -103,7 +95,6 @@ fn card_view(props : @core.Props) -> @core.View {
   let body = props.get_string("body").unwrap_or("")
   let tone = props.get_string("tone").unwrap_or("info")
   @core.View::fragment([
-    @core.View::raw(CARD_CSS),
     @core.View::element("div", [("class", "card")], [
       @core.View::element("div", [("class", "hd \{tone}")], [
         @core.View::text(title),
@@ -114,7 +105,33 @@ fn card_view(props : @core.Props) -> @core.View {
 }
 
 ///|
-/// 注册三个组件。
+/// light DOM 组件的样式：**直接写在 `:host` 上、不带任何前缀**——
+/// 适配层会用 `core.scope_css` 把它改写成 `x-panel ...` 的形式，避免污染整页。
+const PANEL_CSS : String =
+  #|:host { display: block; margin-top: 8px; }
+  #|.panel-title { font-weight: 600; color: #12457f; }
+  #|.panel-body { color: #3b4453; }
+  #|.pill { background: #eef2f7; }   /* 故意与页面里的 .pill 同名 */
+
+///|
+fn panel_view(props : @core.Props) -> @core.View {
+  let title = props.get_string("title").unwrap_or("面板")
+  let body = props.get_string("body").unwrap_or("")
+  @core.View::element("div", [("class", "panel")], [
+    @core.View::element("div", [("class", "panel-title")], [
+      @core.View::text(title),
+    ]),
+    @core.View::element("div", [("class", "panel-body")], [
+      @core.View::text(body),
+    ]),
+    @core.View::element("span", [("class", "pill")], [
+      @core.View::text("light DOM 里的 .pill"),
+    ]),
+  ])
+}
+
+///|
+/// 注册四个组件。
 ///
 /// `on_change` 里派发对外事件：组件自己不需要知道实例 id，也不需要页面去猜。
 pub fn register_demo() -> Unit {
@@ -126,6 +143,7 @@ pub fn register_demo() -> Unit {
       @core.AttrSpec::string("label", "计数"),
     ],
     counter_view,
+    styles=COUNTER_CSS,
     events=[@core.EventSpec::crossing("count-changed")],
     on_change=fn(id, _name) {
       let _ = @dom.dispatch(id, "count-changed", "", false)
@@ -138,6 +156,7 @@ pub fn register_demo() -> Unit {
       @core.AttrSpec::string("tone", "info"),
     ],
     badge_view,
+    styles=BADGE_CSS,
     events=[@core.EventSpec::crossing("badge-changed")],
     on_change=fn(id, _name) {
       let _ = @dom.dispatch(id, "badge-changed", "", false)
@@ -151,6 +170,18 @@ pub fn register_demo() -> Unit {
       @core.AttrSpec::string("tone", "info"),
     ],
     card_view,
+    styles=CARD_CSS,
+  )
+  // 第 4 个组件：light DOM 模式，用 core.scope_css 把样式作用域到标签名
+  @dom.define_component(
+    "x-panel",
+    [
+      @core.AttrSpec::string("title", "面板"),
+      @core.AttrSpec::string("body", ""),
+    ],
+    panel_view,
+    styles=PANEL_CSS,
+    mode=@dom.LightDom,
   )
 }
 
@@ -158,5 +189,7 @@ pub fn register_demo() -> Unit {
 fn main {
   register_demo()
   // 用 println 而不是只注册：控制台能看到一行确认，便于排查"模块到底加载了没有"
-  println("[moon-element] demo 组件已注册：x-counter / x-badge / x-card")
+  println(
+    "[moon-element] demo 组件已注册：x-counter / x-badge / x-card / x-panel（light DOM）",
+  )
 }
