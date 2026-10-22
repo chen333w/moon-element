@@ -1,16 +1,17 @@
-# 可行性验证记录
+# Feasibility notes
 
-日期：2026-10-21（假设 3 补测于 2026-10-22）｜ 工具链：`moon 0.1.20261020` ｜ 机器：macOS arm64
+Date: 2026-10-21 (assumption 3 re-checked 2026-10-22) | Toolchain: `moon 0.1.20261020` | Machine: macOS arm64
 
-选题「MoonBit Web Component 运行时」的前提是：MoonBit 的 JS 后端能把一个真正继承
-`HTMLElement` 的类注册进自定义元素注册表，并且 DOM 回调能回到 MoonBit 代码。以下三条
-假设在写核心功能之前验证，各记录「做法 / 命令 / 输出 / 结论」。
+The premise of this project is that the MoonBit JS backend can register a class that genuinely
+extends `HTMLElement` with the custom element registry, and that DOM callbacks can reach MoonBit
+code. The three assumptions below were checked before writing any core functionality; each records
+method, command, output and conclusion.
 
-## 假设 1：JS 后端能注册真正继承 `HTMLElement` 的自定义元素
+## Assumption 1: the JS backend can register a real `HTMLElement` subclass
 
-**做法**：在 `dom/element_ffi.mbt` 里用 `extern "js"` 内联 JS 定义
-`class MoonElement extends globalThis.HTMLElement` 并调用 `customElements.define`；
-探针返回 `ctor.prototype instanceof HTMLElement`。
+**Method**: define `class MoonElement extends globalThis.HTMLElement` with inline JS in
+`dom/element_ffi.mbt`, call `customElements.define`, and have a probe return
+`ctor.prototype instanceof HTMLElement`.
 
 ```bash
 $ moon check --target js
@@ -20,23 +21,25 @@ $ moon test --target js
 Total tests: 2, passed: 2, failed: 0.
 ```
 
-**结论：成立。** 测试先断言未注册时为 `false`，注册后为 `true`，即原型链确实扎根于
-`HTMLElement`（Custom Elements 注册表的硬性要求，普通类不满足）。
+**Conclusion: holds.** The test asserts `false` before registration and `true` after, i.e. the
+prototype chain is rooted in `HTMLElement`, which the custom element registry requires (an ordinary
+class does not qualify).
 
-## 假设 2：DOM 回调能进入 MoonBit 代码
+## Assumption 2: DOM callbacks can reach MoonBit code
 
-**做法**：把 MoonBit 函数作为回调传给类；探针触发 `connectedCallback` 两次，断言计数增加 2。
+**Method**: pass a MoonBit function as the callback, trigger `connectedCallback` twice through a
+probe, and assert the MoonBit-side counter increased by 2.
 
 ```bash
 $ moon test --target js
 Total tests: 2, passed: 2, failed: 0.
 ```
 
-**结论：成立。** DOM → MoonBit 方向可用。
+**Conclusion: holds.** The DOM → MoonBit direction works.
 
-### 附带结论：JS 后端的回调参数用普通函数类型
+### Finding: callback parameters use plain function types on the JS backend
 
-写成 `FuncRef[() -> Unit]` 编译失败：
+Writing `FuncRef[() -> Unit]` fails to compile:
 
 ```
 Error: [4014] Expr Type Mismatch
@@ -44,53 +47,57 @@ Error: [4014] Expr Type Mismatch
   wanted   : FuncRef[() -> Unit]
 ```
 
-`extern "js"` 函数取值为值时类型是普通函数类型，`FuncRef[T]` 用于无捕获闭包。FFI 文档对
-JS 后端写着「JavaScript supports closure, so there's nothing special to be done here」。
-改用普通函数类型后编译与运行均正常。适配层依赖这一点（它要把 `specs` 与 `render_fn`
-捕获进回调）；若将来复用到 Wasm 后端，需要另行评估 `FuncRef` 与 `make_closure`。
+When an `extern "js"` function takes a value of function type, the type is a plain function type;
+`FuncRef[T]` is for capture-free closures. The FFI documentation states for the JS backend:
+"JavaScript supports closure, so there's nothing special to be done here". Using a plain function
+type compiles and runs correctly. The adapter relies on this, since it captures `specs` and
+`render_fn` into the callbacks; reusing the same layer on a Wasm backend would require evaluating
+`FuncRef` versus `make_closure`.
 
-## 假设 3：MoonBit 产出的 JS 可被外部加载
+## Assumption 3: the JS output can be loaded externally
 
-**做法**：构建 demo 的 js 产物，直接 import 该文件（浏览器加载的同一份），在 node 的最小
-DOM 桩上断言运行时行为。
+**Method**: build the demo's JS artifact, import that file directly (the same one the browser
+loads), and assert runtime behavior on a minimal DOM stub under node.
 
 ```bash
 $ moon build --target js --release
 Finished. moon: ran 2 tasks, now up to date
 
 $ node examples/demo/verify.mjs
-moon-element demo 无头验证
-产物: .../_build/js/release/build/examples/demo/demo.js
-[moon-element] demo 组件已注册：x-counter / x-badge / x-card / x-panel（light DOM）
-  ok   构建产物可以被 ES 模块方式加载并执行
-  ok   加载后四个自定义元素都已注册
-  ok   observedAttributes 由属性规格生成
-  ok   非法属性值回退默认值而不是报错
-  ok   用户输入被转义，不会被当成标签执行
-  ok   light 模式不创建 shadow root
-  ok   样式被 scope_css 作用域到标签名（:host 变成 x-panel）
+bundle: .../_build/js/release/build/examples/demo/demo.js
+[moon-element] demo components registered: x-counter / x-badge / x-card / x-panel (light DOM)
+  ok   the bundle loads and runs as an ES module
+  ok   all four custom elements are registered after loading
+  ok   observedAttributes is generated from the attribute specs
+  ok   an invalid attribute value falls back to the default instead of erroring
+  ok   user input is escaped and never executed as markup
+  ok   light mode creates no shadow root
+  ok   styles are scoped to the tag name by scope_css (:host becomes x-panel)
   ...
-通过 16，失败 0
+passed 16, failed 0
 ```
 
-**结论：成立。** 产物可被 ES 模块方式加载执行，组件注册与运行时行为符合预期。
-该验证已接入 CI（`Build demo and verify the artifact headlessly`）。
+**Conclusion: holds.** The artifact loads and executes as an ES module, and component registration
+and runtime behavior match expectations. This check runs in CI
+(`Build demo and verify the artifact headlessly`).
 
-### 附带结论：`link.js.format` 对可执行包是 no-op
+### Finding: `link.js.format` is a no-op for executable packages
 
-实测：加上与不加上 `link: { "js": { "format": "esm" } }`，产物逐字节相同。可执行包的
-js 产物既无 `export` 也无 `require`，是普通脚本（末尾自带自执行初始化）。该选项只在需要
-对外导出符号时才有意义。
+Measured: with and without `link: { "js": { "format": "esm" } }` the artifact is byte-identical. An
+executable package's JS output has neither `export` nor `require`; it is a plain script with a
+self-executing initialization at the end. The option only matters when symbols must be exported.
 
-浏览器侧能加载是因为 `<script type="module" src="...">` 对无导出的脚本同样有效，
-模块脚本不要求必须有导出。`examples/demo/moon.pkg` 因此不写该选项。
+The browser can still load it because `<script type="module" src="...">` accepts a script with no
+exports — a module script does not have to export anything. `examples/demo/moon.pkg` therefore omits
+the option.
 
-## 工程约定
+## Conventions
 
-- 纯逻辑放 target-agnostic 包；js FFI 集中在 `supported_targets = "js"` 的 `dom/` 包，
-  避免污染全后端构建。
-- 适配层测试用无依赖的 `install_dom_stub()` 在 node 下跑通，不引入 jsdom / happy-dom；
-  构建产物的真实行为由 `examples/demo/verify.mjs` 验证。
-- 每次改动跑 `moon check --deny-warn --target all`，警告视为错误。
-- 改过 `.github/workflows/*.yml` 必须校验 YAML：
-  `ruby -ryaml -e 'YAML.load_file("...")'`。步骤名含 `": "` 会使整个 workflow 无法解析。
+- Target-agnostic logic lives in its own packages; JS FFI is confined to the `dom/` package with
+  `supported_targets = "js"`, so the all-backend build is unaffected
+- Adapter tests run under node against the dependency-free `install_dom_stub()`; no jsdom or
+  happy-dom. Real behavior of the build artifact is verified by `examples/demo/verify.mjs`
+- Every change runs `moon check --deny-warn --target all`; warnings are errors
+- Changes to `.github/workflows/*.yml` must be validated locally with
+  `ruby -ryaml -e 'YAML.load_file("...")'`. A step name containing `": "` makes the whole workflow
+  unparseable

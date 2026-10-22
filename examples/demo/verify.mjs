@@ -1,16 +1,16 @@
-// 无头验证脚本：在 node 里直接 import 构建产物（浏览器加载的同一个文件），
-// 验证它真的能注册组件并正常工作。
+// Headless verification: import the build artifact in node (the same file the browser
+// loads) and check that it really registers the components and works.
 //
-// 用法（仓库根目录）：
+// Usage, from the repository root:
 //   moon build --target js --release
 //   node examples/demo/verify.mjs
 //
-// 退出码 0 表示全部通过，1 表示有断言失败。
+// Exit code 0 means every check passed; 1 means an assertion failed.
 
 import { pathToFileURL } from "node:url";
 
 // ---------------------------------------------------------------------------
-// 最小 DOM 桩，与 dom/element_ffi.mbt 里的 install_dom_stub 等价
+// Minimal DOM stub, equivalent to install_dom_stub in dom/element_ffi.mbt
 // ---------------------------------------------------------------------------
 function installDomStub() {
   if (globalThis.customElements) return;
@@ -58,7 +58,7 @@ function installDomStub() {
 }
 
 // ---------------------------------------------------------------------------
-// 极简断言
+// Minimal assertions
 // ---------------------------------------------------------------------------
 let failed = 0;
 let passed = 0;
@@ -77,40 +77,40 @@ const bundlePath = new URL(
   import.meta.url,
 );
 
-console.log("moon-element demo 无头验证");
-console.log(`产物: ${bundlePath.pathname}`);
+console.log("moon-element demo headless verification");
+console.log(`bundle: ${bundlePath.pathname}`);
 
 installDomStub();
 
-// 直接 import 构建产物（浏览器里对应 <script type="module" src="....js">）
+// Import the build artifact directly (in the browser: <script type="module" src="....js">).
 let importError = null;
 try {
   await import(pathToFileURL(bundlePath.pathname).href);
 } catch (e) {
   importError = e;
 }
-check("构建产物可以被 ES 模块方式加载并执行", importError === null, String(importError));
+check("the bundle loads and runs as an ES module", importError === null, String(importError));
 
 const registry = globalThis.__stubRegistry || {};
 check(
-  "加载后四个自定义元素都已注册",
+  "all four custom elements are registered after loading",
   ["x-counter", "x-badge", "x-card", "x-panel"].every((t) => typeof registry[t] === "function"),
   Object.keys(registry).join(","),
 );
 
 if (typeof registry["x-counter"] === "function") {
   check(
-    "observedAttributes 由属性规格生成",
+    "observedAttributes is generated from the attribute specs",
     JSON.stringify(registry["x-counter"].observedAttributes) ===
       JSON.stringify(["count", "max", "label"]),
     JSON.stringify(registry["x-counter"].observedAttributes),
   );
 
-  // —— x-counter：属性反射 + 渲染 ——
+  // x-counter: attribute reflection + rendering
   const c = new registry["x-counter"]();
   c.connectedCallback();
   check(
-    "默认值生效（count=0, max=10）",
+    "defaults apply (count=0, max=10)",
     c.shadowRoot.innerHTML.includes(">0</div>"),
     c.shadowRoot.innerHTML.slice(0, 120),
   );
@@ -119,67 +119,67 @@ if (typeof registry["x-counter"] === "function") {
   c.addEventListener("count-changed", (ev) => events.push(ev));
 
   c.attributeChangedCallback("count", null, "7");
-  check("合法属性被采用并重渲染", c.shadowRoot.innerHTML.includes(">7</div>"));
+  check("a valid attribute is adopted and re-renders", c.shadowRoot.innerHTML.includes(">7</div>"));
   check(
-    "组件通过 crossing 事件通知页面（bubbles+composed）",
+    "the component notifies the page through a crossing event (bubbles + composed)",
     events.length === 1 && events[0].bubbles === true && events[0].composed === true,
     JSON.stringify(events.map((e) => ({ t: e.type, b: e.bubbles, c: e.composed }))),
   );
-  check("进度条宽度按 count/max 计算", c.shadowRoot.innerHTML.includes("width:70%"));
+  check("the bar width is computed from count/max", c.shadowRoot.innerHTML.includes("width:70%"));
 
   c.attributeChangedCallback("count", "7", "abc");
   check(
-    "非法属性值回退默认值而不是报错",
+    "an invalid attribute value falls back to the default instead of erroring",
     c.shadowRoot.innerHTML.includes(">0</div>"),
     c.shadowRoot.innerHTML.match(/>-?\d+<\/div>/)?.[0],
   );
 
-  // —— x-badge：HTML 转义 ——
+  // x-badge: HTML escaping
   const b = new registry["x-badge"]();
   b.connectedCallback();
-  b.attributeChangedCallback("label", null, "<b>加粗</b>");
+  b.attributeChangedCallback("label", null, "<b>bold</b>");
   check(
-    "用户输入被转义，不会被当成标签执行",
-    b.shadowRoot.innerHTML.includes("&lt;b&gt;加粗&lt;/b&gt;") &&
-      !b.shadowRoot.innerHTML.includes("<b>加粗</b>"),
+    "user input is escaped and never executed as markup",
+    b.shadowRoot.innerHTML.includes("&lt;b&gt;bold&lt;/b&gt;") &&
+      !b.shadowRoot.innerHTML.includes("<b>bold</b>"),
   );
 
-  // —— x-card：组合与实时更新 ——
+  // x-card: composition and live updates
   const k = new registry["x-card"]();
   k.connectedCallback();
   k.attributeChangedCallback("title", null, "T");
   k.attributeChangedCallback("body", null, "B");
   check(
-    "卡片渲染标题与正文",
+    "the card renders title and body",
     k.shadowRoot.innerHTML.includes(">T</div>") && k.shadowRoot.innerHTML.includes(">B</div>"),
   );
-  // 反转义由浏览器负责；这里只确认保留的是转义文本
+  // The browser unescapes on display; here we only check the escaped text is preserved.
   k.attributeChangedCallback("body", "B", "<i>x</i>");
-  check("卡片正文同样走转义", k.shadowRoot.innerHTML.includes("&lt;i&gt;x&lt;/i&gt;"));
+  check("the card body is escaped as well", k.shadowRoot.innerHTML.includes("&lt;i&gt;x&lt;/i&gt;"));
 }
 
-// —— x-panel：light DOM 模式（没有 shadow root，样式被 scope_css 作用域到标签名）——
+// x-panel: light DOM mode (no shadow root; scope_css scopes styles to the tag name)
 if (typeof registry["x-panel"] === "function") {
   const panel = new registry["x-panel"]();
   panel.connectedCallback();
-  check("light 模式不创建 shadow root", !panel.shadowRoot);
+  check("light mode creates no shadow root", !panel.shadowRoot);
   check(
-    "light 模式的内容写在元素自身",
+    "light mode writes its content into the element itself",
     panel.innerHTML.includes("panel-title"),
     panel.innerHTML.slice(0, 120),
   );
   check(
-    "样式被 scope_css 作用域到标签名（:host 变成 x-panel）",
+    "styles are scoped to the tag name by scope_css (:host becomes x-panel)",
     panel.innerHTML.includes("x-panel { display: block; margin-top: 8px; }") &&
       !panel.innerHTML.includes(":host"),
   );
   check(
-    "普通选择器也加了标签名前缀（不会污染页面的 .pill）",
+    "plain selectors get the tag name prefix too (the page's .pill is unaffected)",
     panel.innerHTML.includes("x-panel .pill { background: #eef2f7; color: #3b4453; }"),
   );
-  panel.attributeChangedCallback("body", null, "更新");
-  check("light 模式属性变化同样重渲染", panel.innerHTML.includes("更新"));
+  panel.attributeChangedCallback("body", null, "updated");
+  check("an attribute change re-renders in light mode too", panel.innerHTML.includes("updated"));
 }
 
-console.log(`\n通过 ${passed}，失败 ${failed}`);
+console.log(`\npassed ${passed}, failed ${failed}`);
 process.exit(failed === 0 ? 0 : 1);

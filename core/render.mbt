@@ -1,11 +1,12 @@
 ///|
-/// 视图树。
+/// A view tree.
 ///
-/// 只表达「元素 + 属性 + 子节点 + 文本 + 片段」。渲染是纯函数，
-/// 可以在四个后端上用普通单元测试验证；DOM 挂载由适配层负责。
+/// Expresses only elements, attributes, children, text, and fragments. Rendering is a
+/// pure function, testable with plain unit tests on all four backends; mounting into the
+/// DOM is the adapter's job.
 ///
-/// - `VText` 会被 HTML 转义；`VRaw` 不会，调用方自己负责安全
-/// - `VElement` 是 (标签名, 属性列表, 子节点)
+/// - `VText` is HTML-escaped; `VRaw` is not, and the caller owns safety
+/// - `VElement` is (tag name, attribute list, children)
 pub(all) enum View {
   VText(String)
   VRaw(String)
@@ -20,7 +21,7 @@ pub fn View::text(s : String) -> View {
 }
 
 ///|
-/// 原样输出，**不转义**，仅在内容完全可控时使用。
+/// Emit verbatim, **without escaping**; use only where the content is fully controlled.
 pub fn View::raw(s : String) -> View {
   VRaw(s)
 }
@@ -45,7 +46,7 @@ pub fn View::nothing() -> View {
 }
 
 ///|
-/// 空元素（void elements）：按 HTML 规范没有闭合标签，也不会渲染子节点。
+/// Void elements: no closing tag per the HTML spec, and no children are rendered.
 fn is_void_tag(tag : String) -> Bool {
   for
     name in [
@@ -73,8 +74,8 @@ fn push_string(out : Array[Char], s : String) -> Unit {
 }
 
 ///|
-/// HTML 文本转义。按码点处理以免依赖字符字面量的转义写法：
-/// `&`(38) `<`(60) `>`(62) `"`(34) `'`(39)。
+/// HTML text escaping. Works on code points, so it does not depend on escape sequences
+/// in character literals: `&`(38) `<`(60) `>`(62) `"`(34) `'`(39).
 pub fn escape_text(s : String) -> String {
   let out : Array[Char] = []
   let n = s.char_length()
@@ -125,7 +126,7 @@ fn render_into(view : View, pieces : Array[String]) -> Unit {
         pieces.push("\"")
       }
       pieces.push(">")
-      // void 元素不渲染子节点
+      // void elements render no children
       if !is_void_tag(tag) {
         for child in children {
           render_into(child, pieces)
@@ -139,12 +140,13 @@ fn render_into(view : View, pieces : Array[String]) -> Unit {
 }
 
 ///|
-/// 把视图树渲染成 HTML 字符串。
+/// Render a view tree to an HTML string.
 ///
-/// 输出是确定性的：属性按给定顺序输出，不做重排或去重（属性唯一由调用方保证）。
+/// The output is deterministic: attributes are emitted in the given order, with no
+/// reordering or deduplication (the caller guarantees unique attributes).
 ///
-/// 拼接字符串是 O(n²) 的朴素做法（`out = out + piece`），当前规模下无问题，
-/// 有真实性能需求时再换成缓冲写入。
+/// String concatenation here is the naive O(n²) `out = out + piece`. That is fine at the
+/// current scale; switch to a buffered writer when real performance needs appear.
 pub fn render(view : View) -> String {
   let pieces : Array[String] = []
   render_into(view, pieces)

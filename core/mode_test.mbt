@@ -1,8 +1,9 @@
 ///|
-/// RenderMode 的解析与命名：CLI 与配置用它，所以拼错必须被发现，而不是静默取默认值。
+/// Parsing and naming for RenderMode: the CLI and config depend on it, so a misspelling
+/// must be caught rather than silently defaulting.
 
 ///|
-test "RenderMode: 只接受 shadow / light" {
+test "RenderMode: accepts only shadow / light" {
   assert_eq(@core.RenderMode::parse("shadow"), Some(@core.ShadowDom))
   assert_eq(@core.RenderMode::parse("light"), Some(@core.LightDom))
   assert_eq(@core.RenderMode::parse("Shadow"), None)
@@ -12,7 +13,7 @@ test "RenderMode: 只接受 shadow / light" {
 }
 
 ///|
-test "RenderMode: 名字可往返" {
+test "RenderMode: names round-trip" {
   assert_eq(@core.ShadowDom.name(), "shadow")
   assert_eq(@core.LightDom.name(), "light")
   assert_eq(

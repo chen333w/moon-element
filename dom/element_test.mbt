@@ -1,8 +1,9 @@
 ///|
-/// 浏览器适配层的黑盒测试。
+/// Black-box tests for the browser adapter.
 ///
-/// 无浏览器环境（node）下用探针模拟浏览器的调用顺序：
-/// `new` → `attributeChangedCallback` → `connectedCallback` → 属性变更 → `disconnectedCallback`。
+/// Headless (node), the probes replay the browser call order:
+/// `new` -> `attributeChangedCallback` -> `connectedCallback` -> attribute change
+/// -> `disconnectedCallback`.
 
 ///|
 fn specs() -> Array[@core.AttrSpec] {
@@ -14,7 +15,7 @@ fn specs() -> Array[@core.AttrSpec] {
 }
 
 ///|
-/// 测试用的渲染函数：把两个属性值渲染成一个 span 文本。
+/// Render function under test: renders two attribute values as span text.
 fn render_badge(props : @core.Props) -> @core.View {
   let label = props.get_string("label").unwrap_or("?")
   let count = props.get_int("max-count").unwrap_or(0)
@@ -24,27 +25,27 @@ fn render_badge(props : @core.Props) -> @core.View {
 }
 
 ///|
-test "adapter: observedAttributes 来自规格，只列被声明的属性" {
+test "adapter: observedAttributes comes from the specs and lists only declared attributes" {
   @dom.install_dom_stub()
   @dom.define_component("x-badge-1", specs(), render_badge)
   assert_eq(@dom.probe_observed("x-badge-1"), ["label", "max-count", "disabled"])
 }
 
 ///|
-test "adapter: 属性先于连接设置（升级已有元素的情形）" {
+test "adapter: attribute set before connection (upgrading an existing element)" {
   @dom.install_dom_stub()
   @dom.define_component("x-badge-2", specs(), render_badge)
   let id = @dom.probe_create("x-badge-2")
-  // 浏览器在升级已有元素时，会先回调 observed 属性，再回调 connectedCallback
+  // The browser fires observed attribute callbacks before connectedCallback when upgrading
   @dom.probe_set_attribute(id, "label", "hi")
   assert_eq(@dom.instance_prop_string(id, "label"), Some("hi"))
   assert_eq(@dom.instance_reaction_log(id), ["attribute:label:<none>->hi"])
-  // 未连接时不渲染
+  // No render while disconnected
   assert_eq(@dom.probe_shadow_html(id), "")
 }
 
 ///|
-test "adapter: 连接后渲染进 shadow root，且值来自属性" {
+test "adapter: renders into the shadow root after connect, with values from attributes" {
   @dom.install_dom_stub()
   @dom.define_component("x-badge-3", specs(), render_badge)
   let id = @dom.probe_create("x-badge-3")
@@ -57,7 +58,7 @@ test "adapter: 连接后渲染进 shadow root，且值来自属性" {
 }
 
 ///|
-test "adapter: 已连接时属性变化触发重渲染" {
+test "adapter: attribute change on a connected element re-renders" {
   @dom.install_dom_stub()
   @dom.define_component("x-badge-4", specs(), render_badge)
   let id = @dom.probe_create("x-badge-4")
@@ -69,7 +70,7 @@ test "adapter: 已连接时属性变化触发重渲染" {
 }
 
 ///|
-test "adapter: 非法属性值回退默认值并重渲染" {
+test "adapter: invalid attribute value falls back to the default and re-renders" {
   @dom.install_dom_stub()
   @dom.define_component("x-badge-5", specs(), render_badge)
   let id = @dom.probe_create("x-badge-5")
@@ -81,7 +82,7 @@ test "adapter: 非法属性值回退默认值并重渲染" {
 }
 
 ///|
-test "adapter: 布尔属性按存在即真，移除后回到默认值" {
+test "adapter: boolean attribute is true by presence and returns to the default when removed" {
   @dom.install_dom_stub()
   @dom.define_component("x-badge-6", specs(), render_badge)
   let id = @dom.probe_create("x-badge-6")
@@ -94,7 +95,7 @@ test "adapter: 布尔属性按存在即真，移除后回到默认值" {
 }
 
 ///|
-test "adapter: 断开与重连，计数与反应日志都对" {
+test "adapter: disconnect and reconnect keep the count and the reaction log correct" {
   @dom.install_dom_stub()
   @dom.define_component("x-badge-7", specs(), render_badge)
   let id = @dom.probe_create("x-badge-7")
@@ -104,7 +105,7 @@ test "adapter: 断开与重连，计数与反应日志都对" {
   assert_eq(@dom.instance_reaction_log(id), [
     "connected", "disconnected", "connected",
   ])
-  // 断开后属性变化不渲染，但会被记录
+  // Attribute changes while disconnected do not render but are still logged
   @dom.probe_disconnect(id)
   @dom.probe_set_attribute(id, "label", "later")
   assert_eq(@dom.instance_reaction_log(id), [
@@ -113,7 +114,7 @@ test "adapter: 断开与重连，计数与反应日志都对" {
 }
 
 ///|
-test "adapter: 两个实例互不干扰" {
+test "adapter: two instances do not interfere" {
   @dom.install_dom_stub()
   @dom.define_component("x-badge-8", specs(), render_badge)
   let a = @dom.probe_create("x-badge-8")
@@ -129,7 +130,7 @@ test "adapter: 两个实例互不干扰" {
 }
 
 ///|
-test "adapter: on_change 在状态更新后触发，可用于派发对外事件" {
+test "adapter: on_change fires after the state update and can dispatch outward events" {
   @dom.install_dom_stub()
   let seen : Array[String] = []
   @dom.define_component(
@@ -150,12 +151,12 @@ test "adapter: on_change 在状态更新后触发，可用于派发对外事件"
   assert_eq(@dom.instance_event_log(id), [
     "changed|label|canceled=false", "changed|max-count|canceled=false",
   ])
-  // 回调在渲染之后：此时读到的 DOM 已经是新值
+  // The callback runs after rendering: the DOM already holds the new value
   assert_eq(@dom.probe_shadow_html(id), "<span class=\"badge\">x:5</span>")
 }
 
 ///|
-test "adapter: 无效实例 id 的诊断查询返回空，不抛错" {
+test "adapter: diagnostic queries on an invalid instance id return empty and do not throw" {
   @dom.install_dom_stub()
   assert_eq(@dom.instance_reaction_log(9999), [])
   assert_eq(@dom.instance_event_log(9999), [])
@@ -166,11 +167,11 @@ test "adapter: 无效实例 id 的诊断查询返回空，不抛错" {
 }
 
 ///|
-test "adapter: 未连接就断开（元素已创建但从未触发过回调）不产生反应" {
+test "adapter: disconnect before connect (element created but no callback ever fired) produces no reaction" {
   @dom.install_dom_stub()
   @dom.define_component("x-never-connected", specs(), render_badge)
   let id = @dom.probe_create("x-never-connected")
-  // 这个实例在 MoonBit 侧还不存在，disconnectedCallback 不应抛错
+  // This instance does not exist on the MoonBit side yet; disconnectedCallback must not throw
   @dom.probe_disconnect(id)
   assert_eq(@dom.instance_reaction_log(id), [])
 }
@@ -183,7 +184,7 @@ fn render_light(props : @core.Props) -> @core.View {
 }
 
 ///|
-test "adapter: light 模式不建 shadow root，并用 scope_css 把样式作用域到标签名" {
+test "adapter: light mode builds no shadow root and scopes styles to the tag name with scope_css" {
   @dom.install_dom_stub()
   @dom.define_component(
     "x-light-card",
@@ -194,14 +195,14 @@ test "adapter: light 模式不建 shadow root，并用 scope_css 把样式作用
   )
   let id = @dom.probe_create("x-light-card")
   @dom.probe_connect(id)
-  // 没有 shadow root
+  // No shadow root
   assert_eq(@dom.probe_shadow_html(id), "")
-  // :host 被替换为标签名，普通选择器加上标签名前缀
+  // :host is replaced by the tag name; plain selectors get the tag name prefix
   inspect(
     @dom.probe_inner_html(id),
     content="<style>x-light-card { display: block } x-light-card p { color: red }</style><p>?</p>",
   )
-  // 属性变化重渲染时作用域前缀保持稳定
+  // The scope prefix stays stable across re-renders
   @dom.probe_set_attribute(id, "label", "hi")
   inspect(
     @dom.probe_inner_html(id),
@@ -210,7 +211,7 @@ test "adapter: light 模式不建 shadow root，并用 scope_css 把样式作用
 }
 
 ///|
-test "adapter: shadow 模式样式原样注入，:host 保持不动" {
+test "adapter: shadow mode injects styles as is and leaves :host untouched" {
   @dom.install_dom_stub()
   @dom.define_component(
     "x-shadow-card",
@@ -224,12 +225,12 @@ test "adapter: shadow 模式样式原样注入，:host 保持不动" {
     @dom.probe_shadow_html(id),
     content="<style>:host { display: block } p { color: red }</style><p>?</p>",
   )
-  // 内容在 shadow root 里，元素自身是空的
+  // Content lives in the shadow root; the element itself is empty
   assert_eq(@dom.probe_inner_html(id), "")
 }
 
 ///|
-test "adapter: 没写 styles 时不注入空 style 标签" {
+test "adapter: no styles means no empty style tag" {
   @dom.install_dom_stub()
   @dom.define_component(
     "x-no-style",

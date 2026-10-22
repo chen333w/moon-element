@@ -1,22 +1,24 @@
 ///|
-/// 把一个 `:host` 风格的样式表改写为「以 `scope` 为根」的普通样式表。
+/// Rewrite a `:host`-style stylesheet into a plain stylesheet rooted at `scope`.
 ///
-/// **用途**：在不能使用 shadow DOM 的场合（SSR 输出、light DOM 组件、老环境），
-/// 用一层选择器前缀达到同样的样式隔离效果。
+/// **Purpose**: where shadow DOM is unavailable (SSR output, light DOM components,
+/// older environments), one selector prefix gives the same style isolation.
 ///
-/// 规则：
-/// - 普通规则：每个选择器加 `scope ` 前缀（后代选择器）
-/// - `:host` → 替换为 scope；`:host(.active)` → `scope.active`；`:host .child` → `scope .child`
-/// - 逗号分隔的选择器逐个处理，并且**括号内的逗号不算分隔符**（`:is(a, b)` 不会被拆开）
-/// - `@media` / `@supports` / `@container` / `@layer`：递归处理内部的规则
-/// - 其它 at-rule（如 `@keyframes`）：原样保留——keyframes 的选择器是 `from`/`0%`，不能加前缀
-/// - 注释原样保留
-/// - `scope` 为空串时是恒等操作（不做任何改写）
+/// Rules:
+/// - normal rules: prefix every selector with `scope ` (descendant combinator)
+/// - `:host` → scope; `:host(.active)` → `scope.active`; `:host .child` → `scope .child`
+/// - a comma-separated selector list is split first; **commas inside parentheses are
+///   not separators** (`:is(a, b)` is not split)
+/// - `@media` / `@supports` / `@container` / `@layer`: recurse into the nested rules
+/// - other at-rules (e.g. `@keyframes`): kept verbatim — keyframe selectors are
+///   `from`/`0%` and must not be prefixed
+/// - comments are kept verbatim
+/// - an empty `scope` is the identity transform (nothing is rewritten)
 ///
-/// **已知限制**（未实现完整的 CSS 解析器）：
-/// - 声明块内部原样输出，不做压缩或重排
-/// - 字符串字面量或注释里出现的 `{` / `}` 会干扰块匹配
-/// - `::slotted()` / `:host-context()` 属于 shadow DOM 语义，未做等价转换
+/// **Known limitations** (this is not a full CSS parser):
+/// - declaration blocks are emitted verbatim, with no minification or reordering
+/// - `{` / `}` inside string literals or comments break block matching
+/// - `::slotted()` / `:host-context()` are shadow DOM semantics and have no equivalent here
 pub fn scope_css(css : String, scope : String) -> String {
   let chars : Array[Char] = []
   push_string(chars, css)
@@ -48,7 +50,7 @@ fn copy_range(
 }
 
 ///|
-/// 扫描 `[start, end)` 的 CSS 片段并把作用域化的结果写入 `out`。
+/// Scan the CSS fragment `[start, end)` and write the scoped result to `out`.
 fn scope_range(
   chars : Array[Char],
   start : Int32,
@@ -60,7 +62,7 @@ fn scope_range(
   while i < end {
     let c = chars[i]
     if c == '/' && i + 1 < end && chars[i + 1] == '*' {
-      // 注释：原样拷贝到 "*/"
+      // comment: copy verbatim up to "*/"
       out.push(c)
       out.push(chars[i + 1])
       i = i + 2
@@ -80,7 +82,7 @@ fn scope_range(
       out.push(c)
       i = i + 1
     } else {
-      // 收集 prelude，直到 '{' 或 ';'
+      // collect the prelude up to '{' or ';'
       let prelude : Array[Char] = []
       let mut j = i
       while j < end && chars[j] != '{' && chars[j] != ';' {
@@ -88,7 +90,7 @@ fn scope_range(
         j = j + 1
       }
       if j >= end || chars[j] == ';' {
-        // at-statement（如 @import）或残缺输入：原样输出
+        // at-statement (e.g. @import) or truncated input: emit verbatim
         for prelude_char in prelude {
           out.push(prelude_char)
         }
@@ -99,7 +101,7 @@ fn scope_range(
           i = j
         }
       } else {
-        // 找到匹配的 '}'
+        // find the matching '}'
         let inner_start = j + 1
         let mut depth = 1
         let mut k = inner_start
@@ -123,7 +125,8 @@ fn scope_range(
 }
 
 ///|
-/// 把一条规则的 prelude + 块内容写出去（块内容按规则不同或改写或原样）。
+/// Emit one rule's prelude and block contents, rewriting or copying the block
+/// depending on the rule.
 fn emit_rule(
   chars : Array[Char],
   prelude : Array[Char],
@@ -135,14 +138,14 @@ fn emit_rule(
   let lead = first_non_ws(prelude)
   if lead < prelude.length() && prelude[lead] == '@' {
     if is_conditional_group(prelude, lead) {
-      // 递归处理组内规则
+      // recurse into the rules inside the group
       copy_trimmed(prelude, out)
       out.push(' ')
       out.push('{')
       scope_range(chars, inner_start, inner_end, scope, out)
       out.push('}')
     } else {
-      // @keyframes 等：整条原样保留
+      // @keyframes and similar: keep the whole rule verbatim
       copy_trimmed(prelude, out)
       out.push(' ')
       out.push('{')
@@ -178,7 +181,8 @@ fn copy_trimmed(chars : Array[Char], out : Array[Char]) -> Unit {
 }
 
 ///|
-/// prelude 是否以 `@media` / `@supports` / `@container` / `@layer` 开头（大小写不敏感）。
+/// Whether the prelude starts with `@media` / `@supports` / `@container` / `@layer`
+/// (case-insensitive).
 fn is_conditional_group(prelude : Array[Char], lead : Int32) -> Bool {
   let name : Array[Char] = []
   let mut i = lead + 1
@@ -208,8 +212,8 @@ fn ascii_lower_char(c : Char) -> Char {
 }
 
 ///|
-/// 处理逗号分隔的选择器列表：逐个加 scope 前缀，用 `, ` 连接。
-/// 括号深度 > 0 时的逗号不当作分隔符。
+/// Scope a comma-separated selector list: prefix each selector and join with `, `.
+/// A comma at parenthesis depth > 0 is not a separator.
 fn scope_selector_list(
   prelude : Array[Char],
   lead : Int32,
@@ -245,7 +249,7 @@ fn scope_selector_list(
 }
 
 ///|
-/// 写单个选择器：先归一化空白，再按 `:host` 规则改写。
+/// Emit one selector: normalize whitespace, then apply the `:host` rules.
 fn emit_selector(
   prelude : Array[Char],
   start : Int32,
@@ -264,11 +268,11 @@ fn emit_selector(
     norm[2] == 'o' &&
     norm[3] == 's' &&
     norm[4] == 't' {
-    // :host → scope，并保留其后内容
+    // :host → scope, keeping whatever follows
     push_string(out, scope)
     if n > 5 && norm[5] == '(' {
-      // :host(.active) → scope.active：括号内是复合选择器，直接接在 scope 后面，
-      // 否则会输出无效选择器 scope(.active)。
+      // :host(.active) → scope.active: the parentheses hold a compound selector that
+      // attaches directly to scope. Emitting scope(.active) would be an invalid selector.
       let inner : Array[Char] = []
       let mut depth = 0
       let mut k = 6
@@ -304,7 +308,8 @@ fn emit_selector(
 }
 
 ///|
-/// 归一化选择器空白：连续空白压成一个空格，去掉首尾空白。
+/// Normalize selector whitespace: collapse runs of whitespace to one space and trim
+/// both ends.
 fn normalize_ws(chars : Array[Char], start : Int32, end : Int32) -> Array[Char] {
   let out : Array[Char] = []
   let mut i = start

@@ -1,8 +1,8 @@
 ///|
-/// 元素名校验与骨架生成的黑盒测试（纯逻辑，全后端可跑）。
+/// Blackbox tests for tag-name validation and skeleton generation (pure logic, all backends).
 
 ///|
-test "validate_tag_name: 合法名字" {
+test "validate_tag_name: valid names" {
   assert_true(@core.validate_tag_name("my-widget"))
   assert_true(@core.validate_tag_name("x-badge"))
   assert_true(@core.validate_tag_name("a-1"))
@@ -11,15 +11,15 @@ test "validate_tag_name: 合法名字" {
 }
 
 ///|
-test "validate_tag_name: 拒绝不带连字符的名字" {
-  // 普通标签名不能注册成自定义元素
+test "validate_tag_name: rejects names without a hyphen" {
+  // ordinary tag names cannot be registered as custom elements
   assert_false(@core.validate_tag_name("mywidget"))
   assert_false(@core.validate_tag_name("div"))
   assert_false(@core.validate_tag_name(""))
 }
 
 ///|
-test "validate_tag_name: 拒绝大写、非法字符与首尾连字符" {
+test "validate_tag_name: rejects uppercase, illegal characters and edge hyphens" {
   assert_false(@core.validate_tag_name("My-Widget"))
   assert_false(@core.validate_tag_name("my-Widget"))
   assert_false(@core.validate_tag_name("-my-widget"))
@@ -30,63 +30,63 @@ test "validate_tag_name: 拒绝大写、非法字符与首尾连字符" {
 }
 
 ///|
-test "validate_tag_name: 拒绝保留名与 xml 前缀" {
+test "validate_tag_name: rejects reserved names and the xml prefix" {
   assert_false(@core.validate_tag_name("annotation-xml"))
   assert_false(@core.validate_tag_name("color-profile"))
   assert_false(@core.validate_tag_name("font-face"))
   assert_false(@core.validate_tag_name("xml-my-widget"))
   assert_false(@core.validate_tag_name("XML-my-widget"))
-  // 只是以 xml 开头但不是前缀保留形式的名字，规范也是拒绝的
+  // a name that merely starts with xml is rejected by the spec as well
   assert_false(@core.validate_tag_name("xmlfoo-bar"))
 }
 
 ///|
-test "tag_to_snake: 连字符与点转下划线" {
+test "tag_to_snake: hyphens and dots become underscores" {
   assert_eq(@core.tag_to_snake("my-widget"), "my_widget")
   assert_eq(@core.tag_to_snake("x-badge.v2"), "x_badge_v2")
   assert_eq(@core.tag_to_snake("plain"), "plain")
 }
 
 ///|
-test "component_skeleton: 非法标签名返回 None，不生成跑不起来的代码" {
+test "component_skeleton: invalid tag names return None instead of broken code" {
   assert_true(@core.component_skeleton("mywidget") is None)
   assert_true(@core.component_skeleton("My-Widget") is None)
 }
 
 ///|
-test "component_skeleton: 生成内容包含标签名、标识符与事件声明" {
+test "component_skeleton: output carries the tag name, identifiers and event spec" {
   let code = @core.component_skeleton("x-counter").unwrap_or("")
-  // 注册的目标标签名
+  // the tag name being registered
   assert_true(code.contains("\"x-counter\""))
-  // 标识符按标签名生成
+  // identifiers derived from the tag name
   assert_true(code.contains("render_x_counter"))
   assert_true(code.contains("register_x_counter"))
-  // 默认声明一个跨 shadow 边界的事件
+  // one crossing event declared by default
   assert_true(code.contains("@core.EventSpec::crossing(\"x-counter-changed\")"))
-  // 引用了两个包
+  // both packages referenced
   assert_true(code.contains("\"chen333w/moon-element/core\" @core"))
   assert_true(code.contains("\"chen333w/moon-element/dom\" @dom"))
 }
 
 ///|
-test "component_skeleton: light 模式生成 mode 与 styles 声明" {
+test "component_skeleton: light mode emits the mode and styles declarations" {
   let code = @core.component_skeleton("x-light-panel", mode=@core.LightDom).unwrap_or(
     "",
   )
-  assert_true(code.contains("渲染模式：light"))
+  assert_true(code.contains("render mode: light"))
   assert_true(code.contains("mode=@core.LightDom,"))
   assert_true(code.contains("styles=X_LIGHT_PANEL_CSS,"))
-  // 生成器同时给出 CSS 常量（const 要求大写标识符）
+  // a CSS constant is emitted as well (const requires an uppercase identifier)
   assert_true(code.contains("const X_LIGHT_PANEL_CSS : String ="))
-  // light 模式要提示不建 shadow root
-  assert_true(code.contains("不建 shadow root"))
+  // light mode states that no shadow root is created
+  assert_true(code.contains("no shadow root"))
 }
 
 ///|
-test "component_skeleton: shadow 模式不写 mode，但同样给 styles" {
+test "component_skeleton: shadow mode omits mode but still emits styles" {
   let code = @core.component_skeleton("x-badge-v2").unwrap_or("")
-  assert_true(code.contains("渲染模式：shadow"))
+  assert_true(code.contains("render mode: shadow"))
   assert_true(code.contains("styles=X_BADGE_V2_CSS,"))
   assert_false(code.contains("mode=@core.LightDom,"))
-  assert_true(code.contains("`:host` 可用"))
+  assert_true(code.contains("`:host` works"))
 }

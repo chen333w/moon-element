@@ -1,49 +1,54 @@
-# 设计说明
+# Design notes
 
-记录关键决策与理由。
+Key decisions and their rationale.
 
-## 分层：core 与 dom
+## Layering: core and dom
 
-- 规则（属性解析、回退语义、生命周期、渲染、CSS 作用域、事件、渲染模式）放在 `core`；
-  DOM 接线与实例状态放在 `dom`
-- 动机：规则可在 wasm / wasm-gc / native / js 四个后端上跑普通单元测试，不需要浏览器；
-  `dom` 只需验证「有没有接对」
+- Rules (attribute parsing, fallback semantics, lifecycle, rendering, CSS scoping, events, render
+  modes) live in `core`; DOM wiring and instance state live in `dom`
+- Rationale: the rules are covered by ordinary unit tests on wasm / wasm-gc / native / js without a
+  browser, so `dom` only has to show that the wiring is right
 
-## 跨 FFI 的取舍
+## Cross-FFI trade-offs
 
-- `extern "js"` 的回调参数用普通函数类型：`FuncRef[T]` 要求无捕获，而适配层需要把
-  `specs` 与 `render_fn` 捕获进回调。详见 [feasibility](feasibility.md)
-- 不传 `Option`：跨 FFI 表示不是稳定 ABI。属性老/新值用「存在性 `Bool` + `String`」传递
-- 实例状态取出 → 修改 → 写回：不依赖结构体赋值是引用还是拷贝
-- 实例注册表用按 id 索引的数组，id 由 JS 侧自增分配
+- Callback parameters use plain function types: `FuncRef[T]` requires a capture-free closure, and the
+  adapter needs to capture `specs` and `render_fn`. See [feasibility](feasibility.md)
+- No `Option` across the FFI boundary: its representation is not a stable ABI. Old/new attribute
+  values are passed as a presence `Bool` plus a `String`
+- Instance state is read, mutated and written back, so the code does not depend on whether struct
+  assignment copies or aliases
+- The instance registry is an array indexed by id; ids are allocated on the JS side
 
-## 属性与渲染
+## Attributes and rendering
 
-- 属性缺失或值非法 → 回退默认值（对齐 HTML 宽松语义）；布尔按「存在即真」；
-  反射时 `false` 用「移除属性」表达
-- 整数解析限制 9 位十进制数字：`Int` 宽度可能随后端而异，限制位数可避免静默溢出，
-  让「不接受的值一律回退默认值」在四个后端上一致
-- 渲染是整块 `shadowRoot.innerHTML` 替换，没有 diff。因此组件内部不挂 DOM 监听器
-  （会被下次重渲染换掉），交互放在页面侧
-- 样式通过 `styles` 声明一次：shadow 模式原样注入（`:host` 可用），light 模式先用
-  `scope_css` 作用域到标签名
-- light DOM 的隔离是**选择器优先级**级别的，压不过页面 `!important`，页面直接命中的
-  规则也仍会生效；shadow DOM 是**结构性**隔离
+- Missing or invalid attribute values fall back to the default (HTML semantics); booleans follow
+  presence = true; reflection expresses `false` by removing the attribute
+- Integer parsing accepts at most 9 decimal digits: `Int` width can differ per backend, and bounding
+  the digit count keeps "invalid values always fall back to the default" consistent across backends
+- Rendering replaces `shadowRoot.innerHTML` as a whole, with no diff. Components therefore do not
+  attach DOM listeners internally (the next render replaces them); interaction lives in the page
+- Styles are declared once through `styles`: injected as-is in shadow mode (`:host` works), scoped to
+  the tag name via `scope_css` in light mode
+- Light DOM isolation is specificity-based: it does not override `!important` from the page, and page
+  rules that match directly still apply. Shadow DOM isolation is structural
 
-## 生成器与 CI
+## Generator and CI
 
-- CLI 产物提交进仓库：CI 编译它，并检查「当前 CLI 产出 == 仓库文件」（漂移检查）
-- 生成器产出已格式化的代码，避免与 `moon fmt` 的结果不一致
-- 门禁：`moon check --deny-warn --target all`、四后端测试、接口漂移检查
-  （`moon info` 后校验 `.mbti`）、生成器漂移检查、构建产物级验证
+- CLI output is committed: CI compiles it and checks that the current CLI output equals the committed
+  file (drift check)
+- The generator emits already-formatted code, so `moon fmt` does not change it
+- Gates: `moon check --deny-warn --target all`, tests on four backends, interface drift check
+  (`moon info` then verify `.mbti`), generator drift check, build-artifact verification
 
-## 已知限制
+## Known limitations
 
-- 无逐元素 diff；元素名校验只接受 ASCII 子集；`::slotted()` / `:host-context()` 未做
-  等价转换；不支持多线程 / async（MoonBit 现状：无 OS 线程，async 仅 native 完整）
+- No per-element diff; tag-name validation accepts an ASCII subset; `::slotted()` /
+  `:host-context()` are not rewritten; no threads / async support (MoonBit has no OS threads, and
+  async is complete on native only)
 
-## 覆盖率
+## Coverage
 
-库本体 96.5%（688/713），整仓 83.9%（704/839）。未覆盖的主要是三类：防御性分支
-（索引合法时 `String::get_char` 不返回 `None`）、内联造成的行号归属偏差、
-以及 CLI 入口与 demo 这两条集成路径（由产物级验证、漂移检查与 CI 编译覆盖）。
+Library 96.5% (688/713), whole repo 83.9% (704/839). The uncovered lines are mainly of three kinds:
+defensive branches (e.g. `String::get_char` cannot return `None` for a valid index), line-attribution
+artifacts caused by inlining, and the CLI entry point and demo integration paths, which are covered
+by artifact verification, the drift checks and CI compilation.

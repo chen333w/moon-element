@@ -1,8 +1,8 @@
 ///|
-/// 事件描述与注册表的黑盒测试（纯逻辑，全后端可跑）。
+/// Black-box tests for event specs and the registry (pure logic, runs on every backend).
 
 ///|
-test "EventSpec: 三种常用形态的默认值" {
+test "EventSpec: defaults for the three common shapes" {
   let crossing = @core.EventSpec::crossing("count-changed")
   assert_true(crossing.bubbles())
   assert_true(crossing.composed())
@@ -15,7 +15,7 @@ test "EventSpec: 三种常用形态的默认值" {
 }
 
 ///|
-test "事件名校验：拒绝空名与含空白的名字" {
+test "event name validation: rejects empty and whitespace-containing names" {
   assert_true(@core.is_valid_event_name("count-changed"))
   assert_true(@core.is_valid_event_name("a"))
   assert_false(@core.is_valid_event_name(""))
@@ -25,22 +25,22 @@ test "事件名校验：拒绝空名与含空白的名字" {
 }
 
 ///|
-test "EventRegistry: 注册、去重、拒绝非法名" {
+test "EventRegistry: register, deduplicate, reject invalid names" {
   let reg = @core.EventRegistry::new()
   assert_eq(reg.length(), 0)
   assert_true(reg.add(@core.EventSpec::crossing("count-changed")))
   assert_true(reg.add(@core.EventSpec::contained("internal-step")))
   assert_eq(reg.names(), ["count-changed", "internal-step"])
-  // 重名被拒
+  // duplicate name is rejected
   assert_false(reg.add(@core.EventSpec::contained("count-changed")))
   assert_eq(reg.length(), 2)
-  // 非法名被拒
+  // invalid name is rejected
   assert_false(reg.add(@core.EventSpec::contained("bad name")))
   assert_eq(reg.length(), 2)
 }
 
 ///|
-test "EventRegistry: 按名查找" {
+test "EventRegistry: lookup by name" {
   let reg = @core.EventRegistry::new()
   assert_true(reg.add(@core.EventSpec::crossing("count-changed")))
   let spec = reg

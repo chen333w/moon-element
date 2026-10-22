@@ -1,32 +1,33 @@
 ///|
-/// moon-element CLI：生成自定义元素骨架。
+/// moon-element CLI: generates a custom element skeleton.
 ///
-/// 用法：
+/// Usage:
 /// ```text
 /// moon run cmd/main -- x-counter
 /// moon run cmd/main -- --help
 /// ```
 ///
-/// 生成逻辑在 `core/skeleton.mbt`，这里只负责参数解析与打印。
+/// Generation lives in `core/skeleton.mbt`; this file only parses arguments and prints.
 
 ///|
 fn usage(cmd : @argparse.Command) -> Unit {
   println(cmd.render_help())
   println("")
-  println("示例：")
+  println("Examples:")
   println(
-    "  moon run cmd/main -- x-counter                 # shadow DOM（默认）",
+    "  moon run cmd/main -- x-counter                 # shadow DOM (default)",
   )
   println(
-    "  moon run cmd/main -- x-panel --mode light      # light DOM + scope_css 隔离",
+    "  moon run cmd/main -- x-panel --mode light      # light DOM + scope_css isolation",
   )
   println("")
   println(
-    "自定义元素名规则：必须含连字符；只用小写字母、数字、-、.、_；",
+    "Custom element name rules: must contain a hyphen; only lowercase letters,",
   )
   println(
-    "不能以连字符开头或结尾；不能以 xml 开头；不能是保留名。",
+    "digits, -, ., _; must not start or end with a hyphen; must not start with xml;",
   )
+  println("must not be a reserved name.")
 }
 
 ///|
@@ -37,21 +38,19 @@ fn run() -> Unit {
       @argparse.OptionArg(
         "mode",
         long="mode",
-        about="渲染模式：shadow（默认）或 light",
+        about="Render mode: shadow (default) or light",
       ),
     ],
     positionals=[@argparse.PositionArg("tag")],
-    about="生成 MoonBit 自定义元素骨架（标准 Web Components）",
+    about="Generate a MoonBit custom element skeleton (standard Web Components)",
   )
   let matches = cmd.parse() catch { _ => return usage(cmd) }
-  // --mode 拼错必须报错：静默取默认值会让生成出来的代码与预期不符
+  // A misspelled --mode must fail: silently defaulting generates code the caller did not ask for
   let mode = if matches.values is { "mode": [raw, ..], .. } {
     match @core.RenderMode::parse(raw) {
       Some(m) => m
       None => {
-        println(
-          "错误：--mode 只接受 shadow 或 light，收到 \"\{raw}\"",
-        )
+        println("Error: --mode only accepts shadow or light, got \"\{raw}\"")
         println("")
         return usage(cmd)
       }
@@ -61,11 +60,12 @@ fn run() -> Unit {
   }
   if matches.values is { "tag": [tag, ..], .. } {
     match @core.component_skeleton(tag, mode~) {
-      // 生成内容不带尾换行（由 println 补一个），写进文件后恰好一个结尾换行，
-      // 与 moon fmt 规范化后的结果一致，CI 的漂移检查才有意义。
+      // Generated content carries no trailing newline (println adds one), so a file
+      // written from it ends with exactly one newline, matching what moon fmt
+      // normalizes to; that is what makes the CI drift check meaningful.
       Some(code) => println(code)
       None => {
-        println("错误：\"\{tag}\" 不是合法的自定义元素名。")
+        println("Error: \"\{tag}\" is not a valid custom element name.")
         println("")
         usage(cmd)
       }

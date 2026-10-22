@@ -1,16 +1,17 @@
 ///|
-/// 一组属性的当前取值。
+/// The current values of a group of attributes.
 ///
-/// `Props` 是属性反射的「运行时状态」部分：它把 `specs`（规格，可被多个实例共享）
-/// 与 `values`（取值，每个实例一份）分开存放，避免两个实例互相污染。
-/// 取值的回退语义与 `AttrSpec::parse` 完全一致：缺失或非法 → 默认值。
+/// `Props` is the runtime-state half of attribute reflection: it keeps `specs` (the
+/// specification, shareable between instances) apart from `values` (one set per
+/// instance), so two instances cannot pollute each other. Fallback semantics match
+/// `AttrSpec::parse` exactly: missing or invalid → the default.
 pub struct Props {
   specs : Array[AttrSpec]
   values : Array[AttrValue]
 }
 
 ///|
-/// 按规格建立一份取值，初始全部为默认值。
+/// Build a value set from the specs, all initialized to their defaults.
 pub fn Props::new(specs : Array[AttrSpec]) -> Props {
   let values : Array[AttrValue] = []
   for spec in specs {
@@ -20,10 +21,12 @@ pub fn Props::new(specs : Array[AttrSpec]) -> Props {
 }
 
 ///|
-/// 应用一次属性变化：`None` 表示属性被移除 → 回退默认值。
+/// Apply one attribute change: `None` means the attribute was removed → fall back to the
+/// default.
 ///
-/// 返回 `false` 表示属性名不在规格里（未被观察），此时取值不变。浏览器只会回调
-/// 被观察的属性，该返回值用于防御性检查与调试。
+/// `false` means the attribute name is not in the specs (not observed), in which case no
+/// value changes. Browsers only call back for observed attributes; the return value is
+/// for defensive checks and debugging.
 pub fn Props::apply(self : Props, attr_name : String, raw : String?) -> Bool {
   let mut i = 0
   while i < self.specs.length() {
@@ -49,8 +52,9 @@ pub fn Props::get(self : Props, attr_name : String) -> AttrValue? {
 }
 
 ///|
-/// 按属性名读字符串值；**类型不符**或属性不存在时返回 `None`（不做隐式转换，
-/// 以免把 `max-count` 这类数字属性悄悄当成字符串用）。
+/// Read a string value by attribute name; returns `None` on a **type mismatch** or a
+/// missing attribute. There is no implicit conversion, so numeric attributes such as
+/// `max-count` are never quietly read as strings.
 pub fn Props::get_string(self : Props, attr_name : String) -> String? {
   match self.get(attr_name) {
     Some(VString(s)) => Some(s)
@@ -83,7 +87,7 @@ pub fn Props::get_bool(self : Props, attr_name : String) -> Bool? {
 }
 
 ///|
-/// 规格里的属性名（顺序与 `specs` 一致），用于调试与快照。
+/// The attribute names in the specs, in `specs` order, for debugging and snapshots.
 pub fn Props::keys(self : Props) -> Array[String] {
   let out : Array[String] = []
   for spec in self.specs {

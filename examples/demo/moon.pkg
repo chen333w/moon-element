@@ -7,6 +7,7 @@ import {
 
 pkgtype(kind: "executable")
 
-// 注意：这里**不写** `options(link: { "js": { "format": "esm" } })`。
-// 实测该选项对可执行包的产物没有任何影响（产物既无 export 也无 require，
-// 是普通脚本），留着会让人以为它起了作用。详见 examples/demo/README.md。
+// Note: this file deliberately omits `options(link: { "js": { "format": "esm" } })`.
+// The option makes no difference to an executable package's artifact (no exports, no
+// requires — a plain script), and keeping it would suggest that it does something.
+// See examples/demo/README.md.

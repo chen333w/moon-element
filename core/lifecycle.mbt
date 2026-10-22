@@ -1,25 +1,27 @@
 ///|
-/// 自定义元素的生命周期状态。
+/// Lifecycle state of a custom element.
 ///
-/// 与 DOM 规范一致，连接状态本身是一个布尔量：元素被移出文档后回到 `Unconnected`，
-/// 与「从未连接过」不可区分；痕迹靠计数器与反应日志保留。
+/// As in the DOM spec, the connected state is a boolean: an element removed from the
+/// document returns to `Unconnected` and is indistinguishable from one that was never
+/// connected. Counts and the reaction log keep the history.
 pub(all) enum LifecycleState {
   Unconnected
   Connected
 } derive(Eq, @debug.Debug)
 
 ///|
-/// 显式声明以消除派生方法被隐式提升的废弃警告。
+/// Declare explicitly to silence the deprecation warning for implicitly promoted derived methods.
 pub extend LifecycleState with Eq::{equal, not_equal}
 
 ///|
-/// 显式声明以消除派生方法被隐式提升的废弃警告。
+/// Declare explicitly to silence the deprecation warning for implicitly promoted derived methods.
 pub extend LifecycleState with @debug.Debug::{to_repr}
 
 ///|
-/// 生命周期反应（对应规范中的 custom element reactions）。
+/// A lifecycle reaction (custom element reactions in the spec).
 ///
-/// 构造器前缀 `React` 是为了避免与 `LifecycleState` 的同名构造器混淆。
+/// The `React` constructor prefix avoids clashing with the same-named `LifecycleState`
+/// constructors.
 pub(all) enum Reaction {
   ReactConnected
   ReactDisconnected
@@ -28,19 +30,20 @@ pub(all) enum Reaction {
 } derive(@debug.Debug)
 
 ///|
-/// 显式声明 `Debug` 的方法，消除隐式提升的废弃警告。
+/// Declare `Debug` explicitly to silence the deprecation warning for implicit promotion.
 pub extend Reaction with @debug.Debug::{to_repr}
 
 ///|
-/// 生命周期状态机 + 反应记录。
+/// The lifecycle state machine plus its reaction log.
 ///
-/// 这个结构**完全不碰 DOM**：适配层把浏览器的回调转成这里的调用。
-/// 因此这些规则可以在每个后端上用普通单元测试验证，不需要浏览器。
+/// This structure **never touches the DOM**: the adapter layer turns browser callbacks
+/// into the calls below. The rules are therefore verifiable with plain unit tests on
+/// every backend, no browser required.
 pub struct Lifecycle {
   mut state : LifecycleState
   mut connect_count : Int32
   mut disconnect_count : Int32
-  // 不需要 mut：push 修改的是数组内容，而不是这个字段本身
+  // no mut needed: push mutates the array contents, not this field
   reactions : Array[Reaction]
 }
 
@@ -50,10 +53,10 @@ pub fn Lifecycle::new() -> Lifecycle {
 }
 
 ///|
-/// 元素被插入文档。
+/// The element was inserted into the document.
 ///
-/// 已经处于连接状态时不产生任何反应（与规范一致：「若元素已连接则什么都不做」），
-/// 返回 `false` 表示本次没有产生反应。
+/// An already connected element produces no reaction (per spec, "if the element is
+/// connected, do nothing"); `false` means no reaction was produced this time.
 pub fn Lifecycle::on_connect(self : Lifecycle) -> Bool {
   if self.state == Connected {
     false
@@ -66,7 +69,7 @@ pub fn Lifecycle::on_connect(self : Lifecycle) -> Bool {
 }
 
 ///|
-/// 元素被移出文档。未连接时无反应，返回 `false`。
+/// The element was removed from the document. No reaction when unconnected; returns `false`.
 pub fn Lifecycle::on_disconnect(self : Lifecycle) -> Bool {
   if self.state == Unconnected {
     false
@@ -79,10 +82,11 @@ pub fn Lifecycle::on_disconnect(self : Lifecycle) -> Bool {
 }
 
 ///|
-/// 属性发生变化。
+/// An attribute changed.
 ///
-/// 按规范，无论元素是否已连接都会记录这次变化；「是否属于被观察属性」由适配层
-/// 依据 `observed_attributes` 过滤，本结构不做过滤以便完整留痕。
+/// Per spec the change is recorded whether or not the element is connected. Filtering
+/// out unobserved attributes is the adapter's job, using `observed_attributes`; this
+/// structure does not filter, so the trace stays complete.
 pub fn Lifecycle::on_attribute_changed(
   self : Lifecycle,
   attr_name : String,
@@ -93,7 +97,7 @@ pub fn Lifecycle::on_attribute_changed(
 }
 
 ///|
-/// 元素被移动到另一个文档（`adoptedCallback`）。
+/// The element was moved to another document (`adoptedCallback`).
 pub fn Lifecycle::on_adopted(self : Lifecycle) -> Unit {
   self.reactions.push(ReactAdopted)
 }
@@ -124,13 +128,14 @@ pub fn Lifecycle::reaction_count(self : Lifecycle) -> Int32 {
 }
 
 ///|
-/// 把反应序列转成稳定的字符串序列，便于断言与快照：
+/// Convert the reaction sequence into a stable string sequence, for assertions and
+/// snapshots:
 ///
 /// ```text
 /// connected
 /// disconnected
 /// attribute:max-count:1->2
-/// attribute:max-count:<none>->2     // 属性被新增时旧值为 none
+/// attribute:max-count:<none>->2     // old value is none when the attribute is added
 /// adopted
 /// ```
 pub fn Lifecycle::reaction_log(self : Lifecycle) -> Array[String] {

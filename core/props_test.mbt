@@ -1,5 +1,5 @@
 ///|
-/// Props 的黑盒测试：纯逻辑，全后端可跑。
+/// Black-box tests for Props: pure logic, runs on every backend.
 
 ///|
 fn badge_specs() -> Array[@core.AttrSpec] {
@@ -12,7 +12,7 @@ fn badge_specs() -> Array[@core.AttrSpec] {
 }
 
 ///|
-test "Props: 初始值来自默认值" {
+test "Props: initial values come from the defaults" {
   let props = @core.Props::new(badge_specs())
   assert_eq(props.keys(), ["label", "max-count", "ratio", "disabled"])
   assert_eq(props.get_string("label"), Some("?"))
@@ -22,7 +22,7 @@ test "Props: 初始值来自默认值" {
 }
 
 ///|
-test "Props: 应用合法值" {
+test "Props: applies valid values" {
   let props = @core.Props::new(badge_specs())
   assert_true(props.apply("label", Some("hi")))
   assert_true(props.apply("max-count", Some("12")))
@@ -31,11 +31,11 @@ test "Props: 应用合法值" {
 }
 
 ///|
-test "Props: 非法值回退默认值，而不是报错" {
+test "Props: invalid values fall back to the default instead of raising" {
   let props = @core.Props::new(badge_specs())
   assert_true(props.apply("max-count", Some("abc")))
   assert_eq(props.get_int("max-count"), Some(3))
-  // 先设成合法值，再设成非法值：应当回到默认值而不是保留旧值
+  // set a valid value, then an invalid one: it must fall back to the default, not keep the old value
   assert_true(props.apply("max-count", Some("9")))
   assert_eq(props.get_int("max-count"), Some(9))
   assert_true(props.apply("max-count", Some("9.5")))
@@ -43,7 +43,7 @@ test "Props: 非法值回退默认值，而不是报错" {
 }
 
 ///|
-test "Props: 移除属性回退默认值" {
+test "Props: removing an attribute falls back to the default" {
   let props = @core.Props::new(badge_specs())
   assert_true(props.apply("label", Some("hi")))
   assert_true(props.apply("label", None))
@@ -51,7 +51,7 @@ test "Props: 移除属性回退默认值" {
 }
 
 ///|
-test "Props: 未声明的属性名被拒绝，且不改变任何取值" {
+test "Props: an undeclared attribute name is rejected and changes no value" {
   let props = @core.Props::new(badge_specs())
   assert_false(props.apply("unknown", Some("x")))
   assert_eq(props.get("unknown"), None)
@@ -59,18 +59,18 @@ test "Props: 未声明的属性名被拒绝，且不改变任何取值" {
 }
 
 ///|
-test "Props: 类型不符的读取返回 None（不做隐式转换）" {
+test "Props: a mismatched read returns None (no implicit conversion)" {
   let props = @core.Props::new(badge_specs())
   assert_eq(props.get_int("label"), None)
   assert_eq(props.get_string("max-count"), None)
   assert_eq(props.get_bool("label"), None)
   assert_eq(props.get_double("max-count"), None)
-  // 同名的通用读取仍能看到真实取值
+  // the untyped read still sees the real value
   assert_eq(props.get("label"), Some(@core.VString("?")))
 }
 
 ///|
-test "Props: 布尔按存在即真" {
+test "Props: booleans follow presence means true" {
   let props = @core.Props::new(badge_specs())
   assert_true(props.apply("disabled", Some("")))
   assert_eq(props.get_bool("disabled"), Some(true))
@@ -81,7 +81,7 @@ test "Props: 布尔按存在即真" {
 }
 
 ///|
-test "Props: 多个实例互不污染（specs 可共享，取值各自独立）" {
+test "Props: instances do not pollute each other (shared specs, independent values)" {
   let shared = badge_specs()
   let a = @core.Props::new(shared)
   let b = @core.Props::new(shared)

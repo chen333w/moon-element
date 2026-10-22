@@ -1,8 +1,8 @@
 ///|
-/// 生命周期状态机的黑盒测试。纯逻辑，不碰 DOM，可全后端运行。
+/// Black-box tests for the lifecycle state machine. Pure logic, no DOM, runs on every backend.
 
 ///|
-test "生命周期：连接与断开的基本转换" {
+test "lifecycle: basic connect and disconnect transitions" {
   let lc = @core.Lifecycle::new()
   assert_false(lc.is_connected())
   assert_eq(lc.reaction_log(), [])
@@ -17,7 +17,7 @@ test "生命周期：连接与断开的基本转换" {
 }
 
 ///|
-test "生命周期：重复连接/断开不产生重复反应（与规范一致）" {
+test "lifecycle: repeated connect/disconnect produces no duplicate reactions (per spec)" {
   let lc = @core.Lifecycle::new()
   assert_true(lc.on_connect())
   assert_false(lc.on_connect())
@@ -29,7 +29,7 @@ test "生命周期：重复连接/断开不产生重复反应（与规范一致�
 }
 
 ///|
-test "生命周期：断开后可重连，计数累加" {
+test "lifecycle: reconnect after disconnect increments the counts" {
   let lc = @core.Lifecycle::new()
   assert_true(lc.on_connect())
   assert_true(lc.on_disconnect())
@@ -40,7 +40,7 @@ test "生命周期：断开后可重连，计数累加" {
 }
 
 ///|
-test "生命周期：属性变更在未连接时也被记录" {
+test "lifecycle: attribute changes are recorded while unconnected" {
   let lc = @core.Lifecycle::new()
   lc.on_attribute_changed("max-count", None, Some("3"))
   lc.on_attribute_changed("max-count", Some("3"), None)
@@ -50,7 +50,7 @@ test "生命周期：属性变更在未连接时也被记录" {
 }
 
 ///|
-test "生命周期：state 查询与 adopted 反应" {
+test "lifecycle: state query and the adopted reaction" {
   let lc = @core.Lifecycle::new()
   assert_eq(lc.state(), @core.Unconnected)
   assert_true(lc.on_connect())

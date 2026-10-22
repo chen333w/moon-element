@@ -1,12 +1,12 @@
 <!DOCTYPE html>
-<html lang="zh-CN">
+<html lang="en">
 <head>
 <meta charset="utf-8" />
 <meta name="viewport" content="width=device-width, initial-scale=1" />
-<title>moon-element demo · MoonBit 标准 Web Components</title>
+<title>moon-element demo · standard Web Components in MoonBit</title>
 <style>
-  /* 页面样式。这些选择器如果泄漏进组件内部会污染组件外观；
-     组件用 shadow DOM 隔离，所以不受影响。 */
+  /* Page styles. If these selectors leaked into the components they would change how
+     the components look; shadow DOM keeps them out. */
   body { font: 15px/1.6 system-ui, -apple-system, "Helvetica Neue", sans-serif;
          margin: 0; padding: 32px; color: #1c2330; background: #f6f8fb; }
   h1 { font-size: 22px; margin: 0 0 6px; }
@@ -25,8 +25,8 @@
          color: #cbd5e1; border-radius: 10px; padding: 12px; min-height: 92px; white-space: pre-wrap; }
   .err { background: #ffe9e9; border: 1px solid #ffc9c9; color: #8f1d1d; padding: 12px;
          border-radius: 10px; margin-bottom: 16px; }
-  /* 这里不用 !important：shadow DOM 是结构性隔离，页面规则进不去；
-     light DOM 的隔离靠选择器前缀提高优先级，压不过页面的 !important。 */
+  /* No !important here. Shadow DOM blocks page rules structurally; light DOM isolation
+     only raises specificity through a selector prefix, so a page !important still wins. */
   .pill { background: hotpink; color: #fff; padding: 6px 10px;
           border-radius: 999px; font-size: 13px; }
   span { letter-spacing: .3em; }
@@ -34,57 +34,59 @@
 </head>
 <body>
   <h1>moon-element</h1>
-  <div class="sub">用 MoonBit 写的标准 Web Components —— 组件按标准自定义元素注册，可嵌进任意页面或框架。</div>
+  <div class="sub">Standard Web Components written in MoonBit — registered as custom elements, embeddable in any page or framework.</div>
 
   <div id="boot-error" class="err" hidden></div>
 
   <section>
-    <h2>1 · 属性驱动 + 组件对外派发事件</h2>
+    <h2>1 · Attribute-driven rendering + events out to the page</h2>
     <div class="row">
-      <x-counter id="counter" count="3" max="10" label="已处理任务"></x-counter>
+      <x-counter id="counter" count="3" max="10" label="Tasks processed"></x-counter>
       <div class="row">
         <button id="dec">−1</button>
         <button id="inc">+1</button>
-        <button id="set-bad">设一个非法值 <code>count="abc"</code></button>
+        <button id="set-bad">Set an invalid value <code>count="abc"</code></button>
       </div>
     </div>
     <p class="note">
-      按钮只是改属性：<code>el.setAttribute("count", n)</code>。组件重渲染后，
-      通过声明为 <code>crossing</code>（bubbles + composed）的事件通知页面；
-      非法值不会报错，而是**回退到默认值**。
+      The buttons only set attributes: <code>el.setAttribute("count", n)</code>. The
+      component re-renders and notifies the page through an event declared as
+      <code>crossing</code> (bubbles + composed). An invalid value is not an error; it
+      falls back to the default.
     </p>
     <div id="log"></div>
   </section>
 
   <section>
-    <h2>2 · shadow DOM 样式隔离</h2>
+    <h2>2 · shadow DOM style isolation</h2>
     <div class="row">
-      <x-badge id="badge" label="受组件样式控制" tone="info"></x-badge>
-      <span class="pill">页面里的 .pill（被页面样式染成粉色）</span>
+      <x-badge id="badge" label="styled by the component" tone="info"></x-badge>
+      <span class="pill">the page's .pill (painted pink by page styles)</span>
     </div>
     <p class="note">
-      页面给 <code>.pill</code> 和 <code>span</code> 定了很霸道的样式，但组件内部的
-      <code>.pill</code> 完全不受影响 —— shadow DOM 把样式挡住了。
+      The page gives <code>.pill</code> and <code>span</code> aggressive styles, yet the
+      <code>.pill</code> inside the component is untouched: shadow DOM blocks them.
     </p>
   </section>
 
   <section>
-    <h2>3 · HTML 转义</h2>
+    <h2>3 · HTML escaping</h2>
     <div class="row">
-      <x-badge id="escape-demo" label="正常文本" tone="plain"></x-badge>
-      <button id="inject-html">把 label 设成 <code>&lt;b&gt;加粗&lt;/b&gt;</code></button>
+      <x-badge id="escape-demo" label="plain text" tone="plain"></x-badge>
+      <button id="inject-html">Set the label to <code>&lt;b&gt;bold&lt;/b&gt;</code></button>
     </div>
     <p class="note">
-      设成 HTML 后看到的仍然是**字面文本**：组件默认走转义路径，不会把用户输入当标签执行。
+      The markup still shows up as literal text: the component escapes its text nodes and
+      never executes user input as tags.
     </p>
   </section>
 
   <section>
-    <h2>4 · 组合与实时更新</h2>
+    <h2>4 · Composition and live updates</h2>
     <div class="row">
-      <x-card id="card" title="发布说明" body="在下方输入框里改内容，卡片会实时更新。" tone="info"></x-card>
+      <x-card id="card" title="Release notes" body="Edit the field below; the card updates as you type." tone="info"></x-card>
       <div>
-        <input id="card-body" size="30" value="在下方输入框里改内容，卡片会实时更新。" />
+        <input id="card-body" size="30" value="Edit the field below; the card updates as you type." />
         <select id="card-tone">
           <option value="info">tone=info</option>
           <option value="warn">tone=warn</option>
@@ -94,23 +96,26 @@
   </section>
 
   <section>
-    <h2>5 · 不用 shadow DOM 也能隔离（light DOM 模式）</h2>
+    <h2>5 · Isolation without shadow DOM (light DOM mode)</h2>
     <div class="row">
-      <x-panel title="SSR 友好的面板"
-               body="这个组件没有 shadow root：内容直接渲染在元素自身，样式由 core.scope_css 作用域到 x-panel。">
+      <x-panel title="SSR-friendly panel"
+               body="This component has no shadow root: content renders into the element itself, and core.scope_css scopes the styles to x-panel.">
       </x-panel>
-      <span class="pill">页面里的 .pill（被页面样式染成粉色）</span>
+      <span class="pill">the page's .pill (painted pink by page styles)</span>
     </div>
     <p class="note">
-      对比很直观：组件里的 <code>.pill</code> 是浅灰底（选择器被改写成 <code>x-panel .pill</code>，
-      优先级高于页面的 <code>.pill</code>），页面里的 <code>.pill</code> 仍是粉色。
+      The contrast is visible: the component's <code>.pill</code> stays light grey (its
+      selector is rewritten to <code>x-panel .pill</code>, which outranks the page's
+      <code>.pill</code>), while the page's <code>.pill</code> is still pink.
     </p>
     <p class="note">
-      <strong>但机制不同，边界也不同</strong>：shadow DOM 是<em>结构性隔离</em>，页面规则根本进不去；
-      light DOM 的隔离只是<em>用前缀提高优先级</em>——所以本页的
-      <code>span { letter-spacing: .3em }</code> 仍会透进组件（组件里的 <code>&lt;span&gt;</code> 同样被拉开间距），
-      页面若用 <code>!important</code> 也能压过组件规则。light DOM 适合 SSR 输出、
-      或本来就想让宿主样式透入的场合。
+      <strong>The mechanism differs, and so do the limits</strong>: shadow DOM isolates
+      <em>structurally</em>, so page rules cannot get in at all, while light DOM isolation
+      only <em>raises specificity with a prefix</em>. This page's
+      <code>span { letter-spacing: .3em }</code> still reaches the component (its
+      <code>&lt;span&gt;</code> is spaced out too), and a page rule with
+      <code>!important</code> overrides the component. Light DOM suits SSR output, or
+      hosts that want their styles to bleed in.
     </p>
   </section>
 
@@ -123,21 +128,21 @@
     }
 
     try {
-      // 构建产物：在仓库根目录执行 `moon build --target js --release` 后生成
+      // Build artifact produced by `moon build --target js --release` at the repo root.
       await import("../../_build/js/release/build/examples/demo/demo.js");
     } catch (e) {
       const box = document.getElementById("boot-error");
       box.hidden = false;
       box.textContent =
-        "加载组件失败：" + e.message +
-        " —— 请先在仓库根目录运行 `moon build --target js --release`，再通过 HTTP 服务打开本页" +
-        "（ES 模块不能用 file:// 直接打开，可用 `python3 -m http.server 8000`）。";
+        "Failed to load the components: " + e.message +
+        " — run `moon build --target js --release` at the repo root first, then open this" +
+        " page over HTTP (ES modules cannot load from file://; try `python3 -m http.server 8000`).";
       throw e;
     }
 
     const counter = document.getElementById("counter");
     counter.addEventListener("count-changed", () => {
-      log(`收到 count-changed（跨 shadow 边界）= ${counter.getAttribute("count")}`);
+      log(`count-changed received (crossed the shadow boundary) = ${counter.getAttribute("count")}`);
     });
     document.getElementById("inc").onclick = () => {
       const n = Number(counter.getAttribute("count") || "0");
@@ -149,16 +154,16 @@
     };
     document.getElementById("set-bad").onclick = () => {
       counter.setAttribute("count", "abc");
-      log("把 count 设成 abc —— 组件回退到默认值 0");
+      log("count set to abc — the component falls back to the default 0");
     };
 
     const badge = document.getElementById("badge");
-    badge.addEventListener("badge-changed", () => log("收到 badge-changed"));
+    badge.addEventListener("badge-changed", () => log("badge-changed received"));
 
     const escapeDemo = document.getElementById("escape-demo");
     document.getElementById("inject-html").onclick = () => {
-      escapeDemo.setAttribute("label", "<b>加粗</b>");
-      log("label 已设为 <b>加粗</b>，组件渲染的是字面文本");
+      escapeDemo.setAttribute("label", "<b>bold</b>");
+      log("label set to <b>bold</b>; the component renders it as literal text");
     };
 
     const card = document.getElementById("card");
@@ -167,9 +172,9 @@
 
     const panel = document.querySelector("x-panel");
     log(
-      `x-panel 有 shadowRoot 吗？${panel && panel.shadowRoot ? "有" : "没有（light DOM 模式）"}`,
+      `does x-panel have a shadowRoot? ${panel && panel.shadowRoot ? "yes" : "no (light DOM mode)"}`,
     );
-    log("4 个组件已注册，事件监听已挂上");
+    log("4 components registered, event listeners attached");
   </script>
 </body>
 </html>

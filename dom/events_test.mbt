@@ -1,5 +1,5 @@
 ///|
-/// 事件派发的黑盒测试。
+/// Black-box tests for event dispatch.
 
 ///|
 fn counter_specs() -> Array[@core.AttrSpec] {
@@ -22,7 +22,7 @@ fn define_counter(tag : String) -> Unit {
 }
 
 ///|
-test "dispatch: 声明过的事件按交叉 shadow 边界派发" {
+test "dispatch: declared event dispatches across the shadow boundary" {
   @dom.install_dom_stub()
   define_counter("x-counter-1")
   let id = @dom.probe_create("x-counter-1")
@@ -37,7 +37,7 @@ test "dispatch: 声明过的事件按交叉 shadow 边界派发" {
 }
 
 ///|
-test "dispatch: 声明为 local 的事件不冒泡、不穿边界" {
+test "dispatch: event declared local does not bubble or cross the boundary" {
   @dom.install_dom_stub()
   define_counter("x-counter-2")
   let id = @dom.probe_create("x-counter-2")
@@ -50,7 +50,7 @@ test "dispatch: 声明为 local 的事件不冒泡、不穿边界" {
 }
 
 ///|
-test "dispatch: 未声明的事件用保守默认值" {
+test "dispatch: undeclared event uses conservative defaults" {
   @dom.install_dom_stub()
   define_counter("x-counter-3")
   let id = @dom.probe_create("x-counter-3")
@@ -63,14 +63,14 @@ test "dispatch: 未声明的事件用保守默认值" {
 }
 
 ///|
-test "dispatch: cancelable 事件被 preventDefault 时返回 true" {
+test "dispatch: cancelable event returns true when preventDefault is called" {
   @dom.install_dom_stub()
   define_counter("x-counter-4")
   let id = @dom.probe_create("x-counter-4")
   @dom.probe_connect(id)
   @dom.probe_add_canceling_listener(id, "count-changed")
   assert_true(@dom.dispatch(id, "count-changed", "1", true))
-  // 不可取消时，preventDefault 无效，返回 false
+  // When not cancelable, preventDefault has no effect and dispatch returns false
   assert_false(@dom.dispatch(id, "count-changed", "2", false))
   assert_eq(@dom.instance_event_log(id), [
     "count-changed|1|canceled=true", "count-changed|2|canceled=false",
@@ -78,7 +78,7 @@ test "dispatch: cancelable 事件被 preventDefault 时返回 true" {
 }
 
 ///|
-test "dispatch: 实例 id 无效时返回 false，不抛错" {
+test "dispatch: invalid instance id returns false and does not throw" {
   @dom.install_dom_stub()
   define_counter("x-counter-5")
   assert_false(@dom.dispatch(9999, "count-changed", "", false))
@@ -86,7 +86,7 @@ test "dispatch: 实例 id 无效时返回 false，不抛错" {
 }
 
 ///|
-test "dispatch: 派发不影响渲染与属性状态" {
+test "dispatch: dispatching affects neither render output nor attribute state" {
   @dom.install_dom_stub()
   define_counter("x-counter-6")
   let id = @dom.probe_create("x-counter-6")

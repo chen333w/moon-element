@@ -1,17 +1,18 @@
 ///|
-/// 事件派发：把 `core` 的事件描述落到浏览器的 `CustomEvent` 上。
+/// Event dispatch: maps `core` event specs onto the browser `CustomEvent`.
 ///
-/// 与属性反射一样，规则在 `core`（事件名校验、注册表、bubbles/composed 语义），
-/// 这里只负责接线与日志。
+/// As with attribute reflection, the rules live in `core` (event name validation,
+/// registry, bubbles/composed semantics); this file only does wiring and logging.
 
 ///|
-/// 派发一个自定义事件。
+/// Dispatch a custom event.
 ///
-/// - 事件名在本实例的事件注册表里时，按声明的 `bubbles` / `composed` 派发
-/// - 未声明的事件名仍可派发，用保守默认值（不冒泡、不穿 shadow 边界），
-///   漏声明不会让事件意外穿透出去
-/// - 返回 `true` 表示有监听者调用了 `preventDefault()`
-/// - 实例 id 无效时返回 `false`，不抛错
+/// - a name in this instance's event registry dispatches with its declared
+///   `bubbles` / `composed`
+/// - undeclared names still dispatch, with conservative defaults (no bubbling, no
+///   shadow boundary crossing), so a missing declaration cannot leak an event out
+/// - returns `true` when a listener called `preventDefault()`
+/// - an invalid instance id returns `false` and does not throw
 pub fn dispatch(
   id : Int32,
   event_name : String,
@@ -44,7 +45,7 @@ pub fn dispatch(
 }
 
 ///|
-/// 派发过的事件日志，用于诊断与测试。
+/// Log of dispatched events, for diagnostics and tests.
 pub fn instance_event_log(id : Int32) -> Array[String] {
   match instance_get(id) {
     Some(inst) => inst.event_log
@@ -53,7 +54,7 @@ pub fn instance_event_log(id : Int32) -> Array[String] {
 }
 
 ///|
-/// 本实例声明的事件名，用于诊断与测试。
+/// Event names declared on this instance, for diagnostics and tests.
 pub fn instance_event_names(id : Int32) -> Array[String] {
   match instance_get(id) {
     Some(inst) => inst.event_registry.names()
@@ -82,17 +83,17 @@ extern "js" fn js_dispatch(
   #|    composed,
   #|    cancelable,
   #|  });
-  #|  // dispatchEvent 返回 false 表示有监听者调用了 preventDefault
+  #|  // dispatchEvent returns false when a listener called preventDefault
   #|  const notCanceled = el.dispatchEvent(ev);
   #|  return !notCanceled;
   #|}
 
 // ---------------------------------------------------------------------------
-// 测试探针：无浏览器环境下模拟监听者
+// Test probes: simulate listeners headlessly
 // ---------------------------------------------------------------------------
 
 ///|
-/// 探针：给实例加一个记录型监听者（把事件名、detail、bubbles、composed 记下来）。
+/// Probe: add a recording listener to an instance (logs event name, detail, bubbles, composed).
 pub extern "js" fn probe_add_listener(id : Int32, event_name : String) -> Unit =
   #|(id, name) => {
   #|  const reg = globalThis.__moon_element_instances;
@@ -120,7 +121,7 @@ pub extern "js" fn probe_add_listener(id : Int32, event_name : String) -> Unit =
   #|}
 
 ///|
-/// 探针：给实例加一个会 `preventDefault()` 的监听者。
+/// Probe: add a listener that calls `preventDefault()`.
 pub extern "js" fn probe_add_canceling_listener(
   id : Int32,
   event_name : String,
@@ -137,7 +138,7 @@ pub extern "js" fn probe_add_canceling_listener(
   #|}
 
 ///|
-/// 探针：读取记录型监听者收到的事件列表。
+/// Probe: read the events a recording listener received.
 pub fn probe_listener_log(id : Int32) -> Array[String] {
   let out : Array[String] = []
   for line in js_probe_listener_log(id) {

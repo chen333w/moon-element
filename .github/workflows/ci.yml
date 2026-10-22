@@ -1,5 +1,6 @@
-# MoonBit 项目的 CI 门禁。
-# 结构参照 moonbit-community/starter 的 check.yml，动作版本固定到 commit SHA，避免上游 tag 漂移。
+# CI gate for the MoonBit project.
+# Structure follows moonbit-community/starter check.yml; action versions are pinned
+# to commit SHAs so upstream tag moves cannot affect the build.
 name: ci
 
 on:
@@ -27,7 +28,7 @@ jobs:
         with:
           persist-credentials: false
 
-      # js 后端的测试需要一个 JS 运行时。
+      # The js backend tests need a JS runtime.
       - uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7.1.0
         with:
           node-version: '24'
@@ -47,7 +48,8 @@ jobs:
       - name: Check all backends
         run: moon check --target all --deny-warn
 
-      # 公开接口（.mbti）必须与源码一致且已提交，防止接口漂移。
+      # Public interfaces (.mbti) must match the sources and be committed, guarding
+      # against interface drift.
       - name: Check public interfaces
         run: |
           moon info --target all
@@ -57,7 +59,8 @@ jobs:
       - name: Test all backends
         run: moon test --target all --deny-warn
 
-      # 生成器漂移检查：仓库里的示例必须与 CLI 当前产出完全一致。
+      # Generator drift check: the committed examples must match current CLI output
+      # exactly.
       - name: "CLI: generated skeleton matches committed example"
         run: |
           moon run cmd/main -- x-counter > /tmp/generated-component.mbt
@@ -65,13 +68,14 @@ jobs:
           moon run cmd/main -- x-light-panel --mode light > /tmp/generated-light.mbt
           diff -u examples/generated-light-panel/component.mbt /tmp/generated-light.mbt
 
-      # 构建 demo 产物并在 node 里无头验证。
+      # Build the demo artifact and verify it headlessly under node.
       - name: Build demo and verify the artifact headlessly
         run: |
           moon build --target js --release
           node examples/demo/verify.mjs
 
-      # 覆盖率只作参考（CLI 入口与示例的运行路径不在单元测试覆盖范围内）。
+      # Coverage is informational; the CLI entry point and example run paths are
+      # outside unit-test coverage.
       - name: Coverage (js, informational)
         run: |
           moon test --target js --enable-coverage

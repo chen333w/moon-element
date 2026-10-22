@@ -1,10 +1,11 @@
 ///|
-/// 组件对外派发的事件描述。
+/// Description of an event a component dispatches.
 ///
-/// 三个字段直接对应 `CustomEvent` 的初始化项：
-/// - `bubbles`：是否冒泡到祖先
-/// - `composed`：是否能穿过 shadow 边界。宿主页面要收到组件内部抛出的事件，
-///   跨 shadow 边界的事件必须 `composed = true`，否则会在 shadow root 处被挡住。
+/// The three fields map directly to the `CustomEvent` init options:
+/// - `bubbles`: whether the event bubbles to ancestors
+/// - `composed`: whether the event crosses the shadow boundary. For the host page to
+///   receive an event thrown inside the component, it must be `composed = true`;
+///   otherwise the shadow root stops it.
 pub struct EventSpec {
   name : String
   bubbles : Bool
@@ -21,14 +22,16 @@ pub fn EventSpec::new(
 }
 
 ///|
-/// 组件内部使用、需要穿过 shadow 边界到宿主页面的事件（bubbles + composed 都为 true）。
+/// An event for internal use that must cross the shadow boundary to the host page
+/// (bubbles and composed both true).
 pub fn EventSpec::crossing(name : String) -> EventSpec {
   { name, bubbles: true, composed: true, }
 }
 
 ///|
-/// 只在组件内部使用的事件（不冒泡、不穿 shadow 边界）。
-/// 命名用 `contained` 而不是 `local`：`local` 是 MoonBit 保留字。
+/// An event used only inside the component (does not bubble, does not cross the shadow
+/// boundary).
+/// Named `contained` rather than `local`: `local` is a MoonBit reserved word.
 pub fn EventSpec::contained(name : String) -> EventSpec {
   { name, bubbles: false, composed: false, }
 }
@@ -49,7 +52,8 @@ pub fn EventSpec::composed(self : EventSpec) -> Bool {
 }
 
 ///|
-/// 事件名是否合法：非空、且不含 ASCII 空白（带空格的名字 dispatch 出去没人会收到）。
+/// Whether an event name is valid: non-empty, with no ASCII whitespace (a name
+/// containing a space is dispatched to nobody).
 pub fn is_valid_event_name(name : String) -> Bool {
   let n = name.char_length()
   if n == 0 {
@@ -60,7 +64,7 @@ pub fn is_valid_event_name(name : String) -> Bool {
     match name.get_char(i) {
       Some(c) => {
         let v = c.to_int()
-        // 空格、制表、换行、回车
+        // space, tab, newline, carriage return
         if v == 32 || v == 9 || v == 10 || v == 13 {
           return false
         }
@@ -73,9 +77,10 @@ pub fn is_valid_event_name(name : String) -> Bool {
 }
 
 ///|
-/// 一个组件声明的事件集合。
+/// The set of events a component declares.
 ///
-/// 重名与非法名在注册阶段就被挡住，不必等到派发时才发现事件收不到。
+/// Duplicate and invalid names are rejected at registration time, rather than
+/// surfacing at dispatch time as an event nobody receives.
 pub struct EventRegistry {
   specs : Array[EventSpec]
 }
@@ -86,7 +91,8 @@ pub fn EventRegistry::new() -> EventRegistry {
 }
 
 ///|
-/// 注册一个事件。返回 `false` 表示被拒绝：名字非法，或与已注册的重名。
+/// Register an event. `false` means it was rejected: the name is invalid, or it
+/// duplicates an already registered one.
 pub fn EventRegistry::add(self : EventRegistry, spec : EventSpec) -> Bool {
   if !is_valid_event_name(spec.name()) {
     return false

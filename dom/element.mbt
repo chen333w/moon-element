@@ -1,12 +1,14 @@
 ///|
-/// 浏览器适配层：把 `core` 的属性规格与生命周期状态机接到真实的
-/// custom element 回调上（`observedAttributes` / `attributeChangedCallback` /
-/// `connectedCallback` / `disconnectedCallback`），并把渲染结果写进 shadow root。
+/// Browser adapter: wires the `core` attribute specs and lifecycle state machine
+/// onto the real custom element callbacks (`observedAttributes` /
+/// `attributeChangedCallback` / `connectedCallback` / `disconnectedCallback`) and
+/// writes the render output into the shadow root.
 ///
-/// 属性解析、回退、生命周期等规则都在 `core` 里，本文件只负责与 DOM 的接线和实例状态管理。
+/// Attribute parsing, fallback and lifecycle rules live in `core`; this file only
+/// does the DOM wiring and instance state management.
 
 ///|
-/// 一个已注册组件的静态定义（同 tag 的所有实例共享）。
+/// Static definition of a registered component, shared by all instances of a tag.
 priv struct ComponentDef {
   tag : String
   specs : Array[@core.AttrSpec]
@@ -17,23 +19,24 @@ priv struct ComponentDef {
 }
 
 ///|
-/// 一个元素实例在 MoonBit 侧的状态。
+/// MoonBit-side state of one element instance.
 priv struct Instance {
   props : @core.Props
   lifecycle : @core.Lifecycle
   render_fn : (@core.Props) -> @core.View
   event_registry : @core.EventRegistry
-  // 派发过的事件记录（诊断与测试用）："name:detail:canceled"
+  // Dispatched events (diagnostics and tests): "name:detail:canceled"
   event_log : Array[String]
-  // 渲染时需要：light 模式下作为 scope_css 的作用域
+  // Needed at render time: scopes scope_css in light mode
   tag : String
   styles : String
   mode : @core.RenderMode
 }
 
 ///|
-/// 实例注册表：下标即实例 id（0 号占位，id 由 JS 侧自增分配）。
-/// 用数组而非哈希表，少一个依赖，且 id 与下标一一对应。
+/// Instance registry: the index is the instance id (slot 0 is a placeholder; JS
+/// assigns ids by incrementing). An array instead of a hash map: one less
+/// dependency, and id and index correspond one to one.
 let instances : Array[Instance?] = [None]
 
 ///|
@@ -46,9 +49,9 @@ fn instance_get(id : Int32) -> Instance? {
 }
 
 ///|
-/// 写回实例状态。
-/// 每次都写回，不依赖结构体的别名语义：即使 `instance_get` 取出的是拷贝，
-/// 状态变更也能落到注册表里。
+/// Write instance state back.
+/// Always writes back and does not rely on struct alias semantics, so a state
+/// change reaches the registry even if `instance_get` returned a copy.
 fn instance_put(id : Int32, inst : Instance) -> Unit {
   while instances.length() <= id {
     instances.push(None)
@@ -90,8 +93,9 @@ fn paint(id : Int32) -> Unit {
       let html = if inst.styles == "" {
         body
       } else {
-        // light 模式下组件的 CSS 会泄漏到整页，先用 scope_css 作用域到标签名；
-        // shadow 模式保持原样（`:host` 在 shadow root 里才是有效的）
+        // In light mode component CSS leaks into the whole page, so scope it to
+        // the tag name first; shadow mode injects it as is (`:host` is only
+        // valid inside a shadow root)
         let css = match inst.mode {
           @core.ShadowDom => inst.styles
           @core.LightDom => @core.scope_css(inst.styles, inst.tag)
@@ -108,20 +112,25 @@ fn paint(id : Int32) -> Unit {
 }
 
 ///|
-/// 定义一个自定义元素（`define` 是保留字，所以叫 `define_component`）。
+/// Define a custom element (`define` is a reserved word, hence `define_component`).
 ///
-/// - `specs` 决定 `observedAttributes`：只有列出的属性会触发回调
-/// - `render_fn` 在元素连接时、以及任何被观察属性变化且元素处于连接状态时被调用；
-///   返回的视图渲染成 HTML 写入 shadow root
-/// - 属性在连接之前就被设置（浏览器在升级已有元素时就是这么做的）也能正确处理
-/// - `events` 声明本组件会派发的事件（名字会被校验、重名会被拒），
-///   派发时按声明决定 bubbles / composed；未声明的事件仍可派发，但用保守默认值
-/// - `on_change` 在每次被观察属性变化、且状态更新完毕（含重渲染）之后被调用，
-///   参数是 (实例 id, 属性名)；组件在回调里调用 `dispatch` 派发对外事件
-/// - `styles` 是组件的 CSS，只写一次：shadow 模式下原样注入（`:host` 可用），
-///   light 模式下先用 `scope_css` 作用域到标签名再注入
-/// - `mode` 选 shadow DOM（默认）还是 light DOM；light 模式适合 SSR 输出或
-///   需要宿主样式透入的场合
+/// - `specs` drives `observedAttributes`: only the listed attributes trigger callbacks
+/// - `render_fn` runs when the element connects and when any observed attribute
+///   changes while the element is connected; the returned view is rendered to HTML
+///   and written into the shadow root
+/// - attributes set before connection (what the browser does when upgrading an
+///   existing element) are handled too
+/// - `events` declares the events this component dispatches (names are validated,
+///   duplicates rejected); the declaration decides bubbles / composed at dispatch
+///   time. Undeclared events can still be dispatched, with conservative defaults
+/// - `on_change` runs after every observed attribute change once state updates
+///   (re-render included) are done, with (instance id, attribute name) as
+///   arguments; a component dispatches outward events from here via `dispatch`
+/// - `styles` is the component CSS, written once: injected as is in shadow mode
+///   (`:host` works there), scoped to the tag name with `scope_css` first in light
+///   mode
+/// - `mode` picks shadow DOM (default) or light DOM; light mode suits SSR output
+///   or cases where host styles must reach the component
 pub fn define_component(
   tag : String,
   specs : Array[@core.AttrSpec],
@@ -136,7 +145,7 @@ pub fn define_component(
     @core.ShadowDom => true
     @core.LightDom => false
   }
-  // FixedArray 是定长数组（没有 push），先分配再按下标写入
+  // FixedArray has a fixed length (no push): allocate first, then assign by index
   let observed : FixedArray[String] = FixedArray::make(specs.length(), "")
   let mut oi = 0
   while oi < specs.length() {
@@ -156,8 +165,9 @@ pub fn define_component(
       None => ()
     }
   }
-  // 老/新值用「是否存在 + 字符串」两个参数传，而不是 String?：
-  // Option 的跨 FFI 表示不是稳定 ABI，显式传存在性更可靠。
+  // Old/new values cross the FFI as (presence Bool + String) rather than String?:
+  // the Option representation is not a stable ABI, so an explicit presence flag is
+  // more reliable.
   let on_attribute : (Int32, String, Bool, String, Bool, String) -> Unit = fn(
     id,
     name,
@@ -172,11 +182,11 @@ pub fn define_component(
     inst.lifecycle.on_attribute_changed(name, old_opt, new_opt)
     let _ = inst.props.apply(name, new_opt)
     instance_put(id, inst)
-    // 未连接时不渲染：浏览器也不会渲染一个不在文档里的元素
+    // Do not render while disconnected: the browser renders no element outside the document
     if inst.lifecycle.is_connected() {
       paint(id)
     }
-    // 状态与 DOM 都更新完了再通知调用方，这样回调里读到的是一致的状态
+    // Notify the caller after state and DOM are updated, so the callback sees consistent state
     on_change(id, name)
   }
   js_define(
@@ -185,7 +195,7 @@ pub fn define_component(
 }
 
 ///|
-/// 实例的生命周期反应日志，用于诊断与测试。
+/// Lifecycle reaction log of an instance, for diagnostics and tests.
 pub fn instance_reaction_log(id : Int32) -> Array[String] {
   match instance_get(id) {
     Some(inst) => inst.lifecycle.reaction_log()
@@ -194,7 +204,7 @@ pub fn instance_reaction_log(id : Int32) -> Array[String] {
 }
 
 ///|
-/// 读取实例当前的某个属性取值（已解析、已回退），用于诊断与测试。
+/// Current attribute value of an instance (parsed and fallback applied), for diagnostics and tests.
 pub fn instance_prop(id : Int32, attr_name : String) -> @core.AttrValue? {
   match instance_get(id) {
     Some(inst) => inst.props.get(attr_name)
@@ -203,7 +213,7 @@ pub fn instance_prop(id : Int32, attr_name : String) -> @core.AttrValue? {
 }
 
 ///|
-/// 读取实例当前的某个字符串属性，用于诊断与测试。
+/// Current string attribute of an instance, for diagnostics and tests.
 pub fn instance_prop_string(id : Int32, attr_name : String) -> String? {
   match instance_get(id) {
     Some(inst) => inst.props.get_string(attr_name)
@@ -212,7 +222,7 @@ pub fn instance_prop_string(id : Int32, attr_name : String) -> String? {
 }
 
 ///|
-/// 读取实例当前的某个整数属性，用于诊断与测试。
+/// Current integer attribute of an instance, for diagnostics and tests.
 pub fn instance_prop_int(id : Int32, attr_name : String) -> Int32? {
   match instance_get(id) {
     Some(inst) => inst.props.get_int(attr_name)
@@ -221,16 +231,17 @@ pub fn instance_prop_int(id : Int32, attr_name : String) -> Int32? {
 }
 
 // ---------------------------------------------------------------------------
-// 下面是 JS 侧接线与测试探针。真实浏览器里由浏览器触发回调；
-// 无浏览器环境（node）下用探针模拟同样的调用顺序。
+// JS-side wiring and test probes. In a real browser the browser fires these
+// callbacks; headlessly (node) the probes replay the same call order.
 // ---------------------------------------------------------------------------
 
 ///|
-/// 注册一个自定义元素类：
-/// - 构造函数分配实例 id，并登记到 id → 元素 的映射
-/// - `observedAttributes` 取自规格
-/// - `connectedCallback` 里按需创建 shadow root，然后再进 MoonBit
-/// - `attributeChangedCallback` 把 null 的老/新值转成「存在性 + 字符串」再进 MoonBit
+/// Register a custom element class:
+/// - the constructor assigns the instance id and records it in the id -> element map
+/// - `observedAttributes` comes from the specs
+/// - `connectedCallback` creates the shadow root on demand, then enters MoonBit
+/// - `attributeChangedCallback` turns null old/new values into (presence + string)
+///   before entering MoonBit
 extern "js" fn js_define(
   tag : String,
   observed : FixedArray[String],
@@ -258,7 +269,7 @@ extern "js" fn js_define(
   #|      return observed;
   #|    }
   #|    connectedCallback() {
-  #|      // light 模式下不建 shadow root：内容直接写进元素自身
+  #|      // light mode creates no shadow root: content goes into the element itself
   #|      if (useShadow && !this.shadowRoot) {
   #|        this.attachShadow({ mode: "open" });
   #|      }
@@ -270,7 +281,7 @@ extern "js" fn js_define(
   #|    attributeChangedCallback(name, oldValue, newValue) {
   #|      const hadOld = oldValue !== null && oldValue !== undefined;
   #|      const hasNew = newValue !== null && newValue !== undefined;
-  #|      // 记住当前值，这样探针下次能给出正确的 oldValue（浏览器也会这么传）
+  #|      // remember the current value so the next probe reports the right oldValue (the browser does the same)
   #|      if (hasNew) {
   #|        this.__moonAttrs[name] = String(newValue);
   #|      } else {
@@ -301,7 +312,7 @@ extern "js" fn js_set_shadow_html(id : Int32, html : String) -> Unit =
   #|}
 
 ///|
-/// light 模式：把渲染结果写进元素自身（没有 shadow root）
+/// Light mode: write the render output into the element itself (no shadow root)
 extern "js" fn js_set_inner_html(id : Int32, html : String) -> Unit =
   #|(id, html) => {
   #|  const reg = globalThis.__moon_element_instances;
@@ -312,7 +323,7 @@ extern "js" fn js_set_inner_html(id : Int32, html : String) -> Unit =
   #|}
 
 ///|
-/// 探针：元素自身的 innerHTML（light 模式下用它断言；shadow 模式下为空）
+/// Probe: innerHTML of the element itself (asserted in light mode; empty in shadow mode)
 pub extern "js" fn probe_inner_html(id : Int32) -> String =
   #|(id) => {
   #|  const reg = globalThis.__moon_element_instances;
@@ -321,7 +332,7 @@ pub extern "js" fn probe_inner_html(id : Int32) -> String =
   #|}
 
 ///|
-/// 探针：某个 tag 的 `observedAttributes`。
+/// Probe: `observedAttributes` of a tag.
 pub fn probe_observed(tag : String) -> Array[String] {
   let out : Array[String] = []
   for name in js_probe_observed(tag) {
@@ -340,7 +351,7 @@ extern "js" fn js_probe_observed(tag : String) -> FixedArray[String] =
   #|}
 
 ///|
-/// 探针：创建一个实例并返回它的 id（构造函数会分配 id）。
+/// Probe: create an instance and return its id (the constructor assigns the id).
 pub extern "js" fn probe_create(tag : String) -> Int32 =
   #|(tag) => {
   #|  const reg = globalThis.__moon_element_instances;
@@ -353,7 +364,7 @@ pub extern "js" fn probe_create(tag : String) -> Int32 =
   #|}
 
 ///|
-/// 探针：模拟浏览器把元素插入文档。
+/// Probe: simulate the browser inserting the element into the document.
 pub extern "js" fn probe_connect(id : Int32) -> Unit =
   #|(id) => {
   #|  const reg = globalThis.__moon_element_instances;
@@ -364,7 +375,7 @@ pub extern "js" fn probe_connect(id : Int32) -> Unit =
   #|}
 
 ///|
-/// 探针：模拟浏览器把元素移出文档。
+/// Probe: simulate the browser removing the element from the document.
 pub extern "js" fn probe_disconnect(id : Int32) -> Unit =
   #|(id) => {
   #|  const reg = globalThis.__moon_element_instances;
@@ -375,7 +386,7 @@ pub extern "js" fn probe_disconnect(id : Int32) -> Unit =
   #|}
 
 ///|
-/// 探针：模拟浏览器设置属性（oldValue 取上次记录的值）。
+/// Probe: simulate the browser setting an attribute (oldValue comes from the last record).
 pub extern "js" fn probe_set_attribute(
   id : Int32,
   name : String,
@@ -396,7 +407,7 @@ pub extern "js" fn probe_set_attribute(
   #|}
 
 ///|
-/// 探针：模拟浏览器移除属性。
+/// Probe: simulate the browser removing an attribute.
 pub extern "js" fn probe_remove_attribute(id : Int32, name : String) -> Unit =
   #|(id, name) => {
   #|  const reg = globalThis.__moon_element_instances;
@@ -413,7 +424,7 @@ pub extern "js" fn probe_remove_attribute(id : Int32, name : String) -> Unit =
   #|}
 
 ///|
-/// 探针：实例 shadow root 的当前 HTML。
+/// Probe: current HTML of the instance shadow root.
 pub extern "js" fn probe_shadow_html(id : Int32) -> String =
   #|(id) => {
   #|  const reg = globalThis.__moon_element_instances;

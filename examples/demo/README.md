@@ -1,56 +1,60 @@
-# demo · 用 MoonBit 写的标准 Web Components
+# demo · standard Web Components in MoonBit
 
-四个组件 + 一个可交互页面 + 一个无头验证脚本。
+Four components, one interactive page, one headless verification script.
 
-## 怎么跑
+## Running it
 
 ```bash
-# 1) 在仓库根目录构建 js 产物
+# 1) build the js artifact from the repository root
 moon build --target js --release
 
-# 2) 起本地 HTTP 服务（ES 模块不能用 file:// 直接打开）
+# 2) serve it locally (ES modules cannot load over file://)
 python3 -m http.server 8000
 
-# 3) 浏览器打开
+# 3) open it in a browser
 open http://localhost:8000/examples/demo/
 ```
 
-跳过浏览器，直接验证运行时行为：
+To verify runtime behaviour without a browser:
 
 ```bash
 node examples/demo/verify.mjs
 ```
 
-它加载构建产物（页面加载的同一个文件），在 node 的最小 DOM 桩上断言组件注册、属性反射、
-非法值回退、HTML 转义、事件派发、light DOM 渲染，共 16 项。
+It imports the build artifact (the same file the page loads) and asserts component
+registration, attribute reflection, fallback for invalid values, HTML escaping, event
+dispatch, and light DOM rendering on a minimal DOM stub: 16 checks in total.
 
-## 页面上能看到什么
+## What the page shows
 
-| 区域 | 演示的能力 |
+| Section | Capability |
 | --- | --- |
-| 1 · 计数器 | 属性驱动重渲染（`el.setAttribute("count", n)`）、非法值回退默认值、通过 `crossing` 事件（`bubbles + composed`）通知页面 |
-| 2 · 徽章 | shadow DOM 样式隔离：页面给 `.pill` / `span` 定了很强的样式，组件内部不受影响 |
-| 3 · 转义 | 把 `label` 设成 `<b>加粗</b>`，渲染为字面文本 |
-| 4 · 卡片 | 组合结构 + 实时更新（输入框改 `body` 属性） |
-| 5 · light DOM 面板 | `mode=LightDom` + `styles`：适配层用 `scope_css` 把选择器前缀成 `x-panel ...` |
+| 1 · counter | attribute-driven re-rendering (`el.setAttribute("count", n)`), fallback to the default for invalid values, notification through a `crossing` event (`bubbles + composed`) |
+| 2 · badge | shadow DOM style isolation: the page sets strong styles on `.pill` / `span`, the component is unaffected |
+| 3 · escaping | set `label` to `<b>bold</b>`, it renders as literal text |
+| 4 · card | composed structure with live updates (the input drives the `body` attribute) |
+| 5 · light DOM panel | `mode=LightDom` + `styles`: the adapter prefixes selectors with `scope_css` to `x-panel ...` |
 
-数据流是单向的：页面改属性 → 组件重渲染 → 组件抛事件 → 页面收到。组件内部不挂 DOM 监听器
-（渲染是整块 `innerHTML` 替换，内部监听器会随重渲染丢失），交互按钮放在页面侧。
+Data flows one way: page sets attribute → component re-renders → component emits event →
+page receives it. Components attach no DOM listeners (re-rendering replaces the whole
+`innerHTML` and would drop them), so the interactive controls live on the page side.
 
-## 两种隔离模式的差别
+## The two isolation modes
 
-| | shadow DOM（默认） | light DOM |
+| | shadow DOM (default) | light DOM |
 | --- | --- | --- |
-| 隔离方式 | 结构性：页面 CSS 进不到 shadow root | 优先级：选择器被前缀成 `x-panel .pill`，优先级高于页面 `.pill` |
-| `:host` | 直接可用 | 由 `scope_css` 改写成标签名 |
-| 页面 `!important` | 无效（进不来） | 有效（会压过组件规则） |
-| 页面普通规则 | 无效 | 直接命中的仍会生效（例如 `span { letter-spacing }`） |
-| 适用 | 组件样式自治 | SSR 输出、需要宿主样式透入 |
+| Isolation | structural: page CSS cannot reach the shadow root | specificity: selectors are prefixed to `x-panel .pill`, outranking the page's `.pill` |
+| `:host` | usable as is | rewritten to the tag name by `scope_css` |
+| page `!important` | has no effect | wins over the component's rules |
+| ordinary page rules | have no effect | still apply where they match directly (e.g. `span { letter-spacing }`) |
+| suited to | self-contained component styles | SSR output, or hosts that want their styles to bleed in |
 
-## `link.js.format` 对可执行包是 no-op
+## `link.js.format` is a no-op for executable packages
 
-实测（`moon 0.1.20261020`）：加上与不加上 `link: { "js": { "format": "esm" } }`，产物逐字节相同。
-可执行包的 js 产物既无 `export` 也无 `require`，是普通脚本。
+Measured on `moon 0.1.20261020`: with and without `link: { "js": { "format": "esm" } }`,
+the artifact is byte-for-byte identical. The js artifact of an executable package exports
+nothing and requires nothing; it is a plain script.
 
-浏览器仍能用 `<script type="module" src="./demo.js">` 加载：模块脚本不要求必须有导出，
-产物末尾的自执行初始化会照常运行。`moon.pkg` 因此不写该选项。
+Browsers still load it with `<script type="module" src="./demo.js">`: a module script does
+not need exports, and the self-executing initialization at the end of the artifact runs as
+usual. `moon.pkg` therefore omits the option.

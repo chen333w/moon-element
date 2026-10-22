@@ -1,10 +1,11 @@
 ///|
-/// demo 用的四个组件：属性反射（含非法值回退）、shadow DOM 样式隔离、
-/// HTML 转义、组件对外派发事件。
+/// The demo's four components: attribute reflection with a fallback for invalid values,
+/// shadow DOM style isolation, HTML escaping, and events dispatched to the page.
 ///
-/// 数据流单向：页面改属性 → 组件重渲染 → 组件抛事件 → 页面收到。
-/// 组件内部不挂 DOM 监听器（渲染用 innerHTML 替换，内部监听器会随重渲染丢失），
-/// 交互按钮因此放在页面（light DOM）里。
+/// Data flows one way: the page sets an attribute, the component re-renders and emits an
+/// event, the page receives it. Components attach no DOM listeners of their own
+/// (re-rendering replaces innerHTML and would drop them), so the demo's buttons live in
+/// the page (light DOM) instead.
 
 ///|
 const COUNTER_CSS : String =
@@ -20,8 +21,8 @@ const COUNTER_CSS : String =
 fn counter_view(props : @core.Props) -> @core.View {
   let count = props.get_int("count").unwrap_or(0)
   let max = props.get_int("max").unwrap_or(10)
-  let label = props.get_string("label").unwrap_or("计数")
-  // max 为 0 或负数时不做除法，避免除零
+  let label = props.get_string("label").unwrap_or("Count")
+  // No division when max is zero or negative.
   let pct = if max > 0 {
     let raw = count * 100 / max
     if raw < 0 {
@@ -72,7 +73,7 @@ fn badge_view(props : @core.Props) -> @core.View {
   let tone = props.get_string("tone").unwrap_or("info")
   @core.View::fragment([
     @core.View::element("span", [("class", "pill \{tone_class(tone)}")], [
-      // label 走 VText，会被转义——页面传 <b>hi</b> 时看到的是字面文本
+      // Text views are escaped: <b>hi</b> passed from the page renders literally.
       @core.View::text(label),
     ]),
   ])
@@ -89,7 +90,7 @@ const CARD_CSS : String =
 
 ///|
 fn card_view(props : @core.Props) -> @core.View {
-  let title = props.get_string("title").unwrap_or("无标题")
+  let title = props.get_string("title").unwrap_or("Untitled")
   let body = props.get_string("body").unwrap_or("")
   let tone = props.get_string("tone").unwrap_or("info")
   @core.View::fragment([
@@ -103,19 +104,19 @@ fn card_view(props : @core.Props) -> @core.View {
 }
 
 ///|
-/// light DOM 组件的样式直接写在 `:host` 上：适配层会用 `core.scope_css`
-/// 把它改写成 `x-panel ...`，避免污染整页。
+/// A light DOM component writes its styles against `:host`; the adapter rewrites them
+/// with `core.scope_css` to `x-panel ...`, so they cannot leak into the page.
 const PANEL_CSS : String =
   #|:host { display: block; margin-top: 8px; }
   #|.panel-title { font-weight: 600; color: #12457f; }
   #|.panel-body { color: #3b4453; }
-  #|/* 与页面里的 .pill 同名；background 与 color 都要自己定，
-  #|   否则页面的 color:#fff 会透入，变成浅底白字 */
+  #|/* Same class name as the page's .pill. Set both background and color here,
+  #|   otherwise the page's color:#fff bleeds in and the text goes white on a light background. */
   #|.pill { background: #eef2f7; color: #3b4453; }
 
 ///|
 fn panel_view(props : @core.Props) -> @core.View {
-  let title = props.get_string("title").unwrap_or("面板")
+  let title = props.get_string("title").unwrap_or("Panel")
   let body = props.get_string("body").unwrap_or("")
   @core.View::element("div", [("class", "panel")], [
     @core.View::element("div", [("class", "panel-title")], [
@@ -125,21 +126,20 @@ fn panel_view(props : @core.Props) -> @core.View {
       @core.View::text(body),
     ]),
     @core.View::element("span", [("class", "pill")], [
-      @core.View::text("light DOM 里的 .pill"),
+      @core.View::text("the .pill inside light DOM"),
     ]),
   ])
 }
 
 ///|
-/// 注册四个组件。
-/// `on_change` 里派发对外事件，调用方不需要知道实例 id。
+/// Registers the four components; each `on_change` hook dispatches its outward event.
 pub fn register_demo() -> Unit {
   @dom.define_component(
     "x-counter",
     [
       @core.AttrSpec::int("count", 0),
       @core.AttrSpec::int("max", 10),
-      @core.AttrSpec::string("label", "计数"),
+      @core.AttrSpec::string("label", "Count"),
     ],
     counter_view,
     styles=COUNTER_CSS,
@@ -164,18 +164,18 @@ pub fn register_demo() -> Unit {
   @dom.define_component(
     "x-card",
     [
-      @core.AttrSpec::string("title", "无标题"),
+      @core.AttrSpec::string("title", "Untitled"),
       @core.AttrSpec::string("body", ""),
       @core.AttrSpec::string("tone", "info"),
     ],
     card_view,
     styles=CARD_CSS,
   )
-  // light DOM 模式：用 core.scope_css 把样式作用域到标签名
+  // Light DOM mode: core.scope_css scopes the styles to the tag name.
   @dom.define_component(
     "x-panel",
     [
-      @core.AttrSpec::string("title", "面板"),
+      @core.AttrSpec::string("title", "Panel"),
       @core.AttrSpec::string("body", ""),
     ],
     panel_view,
@@ -187,8 +187,7 @@ pub fn register_demo() -> Unit {
 ///|
 fn main {
   register_demo()
-  // 打印一行确认，便于排查模块是否加载
   println(
-    "[moon-element] demo 组件已注册：x-counter / x-badge / x-card / x-panel（light DOM）",
+    "[moon-element] demo components registered: x-counter / x-badge / x-card / x-panel (light DOM)",
   )
 }

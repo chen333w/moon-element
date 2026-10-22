@@ -1,8 +1,9 @@
 ///|
-/// 属性的值类型。
+/// Attribute value types, plus the rules that map an HTML attribute string to a
+/// MoonBit value.
 ///
-/// 对应「HTML 属性字符串 → MoonBit 值」的转换规则。布尔属性遵循 HTML 语义：
-/// **属性存在即为 true**，与属性的字面内容无关（`<x-flag>` 与 `<x-flag="">` 都是 true）。
+/// Boolean attributes follow HTML semantics: **presence means true**, independent of
+/// the literal content (`<x-flag>` and `<x-flag="">` are both true).
 pub(all) enum AttrKind {
   AttrString
   AttrInt
@@ -11,17 +12,19 @@ pub(all) enum AttrKind {
 } derive(Eq, @debug.Debug)
 
 ///|
-/// `derive` 生成的方法默认会被隐式提升为普通方法（已废弃行为），显式声明以消除警告。
+/// `derive` produces these as implicitly promoted methods (deprecated); declare them
+/// explicitly to silence the warning.
 pub extend AttrKind with Eq::{equal, not_equal}
 
 ///|
 pub extend AttrKind with @debug.Debug::{to_repr}
 
 ///|
-/// 属性的值。
+/// An attribute value.
 ///
-/// 整数用 `Int` 承载。解析侧把可接受的位数限制为 **最多 9 位十进制数字**：
-/// `Int` 宽度可能随后端而异，限制位数可保证非法值一律回退默认值、跨后端行为一致。
+/// Integers are carried as `Int`. The parsers accept at most **9 decimal digits**:
+/// `Int` width may differ between backends, so capping the digit count keeps invalid
+/// values on the default and behaviour identical across backends.
 pub(all) enum AttrValue {
   VString(String)
   VInt(Int32)
@@ -30,19 +33,19 @@ pub(all) enum AttrValue {
 } derive(Eq, @debug.Debug)
 
 ///|
-/// 显式声明以消除派生方法被隐式提升的废弃警告。
+/// Declare explicitly to silence the deprecation warning for implicitly promoted derived methods.
 pub extend AttrValue with Eq::{equal, not_equal}
 
 ///|
-/// 显式声明以消除派生方法被隐式提升的废弃警告。
+/// Declare explicitly to silence the deprecation warning for implicitly promoted derived methods.
 pub extend AttrValue with @debug.Debug::{to_repr}
 
 ///|
-/// 一个「可观察属性」的规格。
+/// Specification of one observable attribute.
 ///
-/// - `attr_name` 是 HTML 侧的名字，按惯例用 kebab-case（如 `max-count`）
-/// - MoonBit 侧的名字（camelCase）由 `prop_name()` 推导，避免两处各写一遍而不一致
-/// - `default` 是属性缺失**或值非法**时使用的值
+/// - `attr_name` is the HTML-side name, kebab-case by convention (e.g. `max-count`)
+/// - `prop_name()` derives the MoonBit-side camelCase name, so the two cannot drift apart
+/// - `default` is used when the attribute is missing **or its value is invalid**
 pub struct AttrSpec {
   attr_name : String
   kind : AttrKind
@@ -70,7 +73,7 @@ pub fn AttrSpec::bool(attr_name : String, default : Bool) -> AttrSpec {
 }
 
 ///|
-/// MoonBit 侧的属性名：`max-count` → `maxCount`。
+/// MoonBit-side attribute name: `max-count` → `maxCount`.
 pub fn AttrSpec::prop_name(self : AttrSpec) -> String {
   kebab_to_camel(self.attr_name)
 }
@@ -91,11 +94,11 @@ pub fn AttrSpec::default_value(self : AttrSpec) -> AttrValue {
 }
 
 ///|
-/// 解析属性的原始值。
+/// Parse a raw attribute value.
 ///
-/// - `None`（属性不存在或已被移除）→ 默认值
-/// - 字符串非法（例如 `AttrInt` 却给了 `"abc"`）→ **默认值**，与 HTML 的宽松语义一致
-/// - `AttrBool`：`Some(_)` 一律为 true（存在即真）
+/// - `None` (attribute absent or removed) → the default
+/// - invalid string (e.g. `"abc"` for `AttrInt`) → the **default**, matching HTML's lenient semantics
+/// - `AttrBool`: any `Some(_)` is true (presence means true)
 pub fn AttrSpec::parse(self : AttrSpec, raw : String?) -> AttrValue {
   match raw {
     None => self.default
@@ -118,10 +121,11 @@ pub fn AttrSpec::parse(self : AttrSpec, raw : String?) -> AttrValue {
 }
 
 ///|
-/// 值 → 属性字符串；返回 `None` 表示「应当移除该属性」。
+/// Value → attribute string. `None` means the attribute should be removed.
 ///
-/// 只有 `VBool(false)` 会返回 `None`：布尔属性的真假由「属性存在与否」承载，
-/// 不能靠把字符串设成 `"false"` 来表达（那反而会被按存在即真解析成 true）。
+/// Only `VBool(false)` returns `None`: a boolean's state lives in whether the attribute
+/// is present, not in its text. Setting the string to `"false"` cannot express false —
+/// it would parse back as true under presence-means-true.
 pub fn AttrValue::to_attr(self : AttrValue) -> String? {
   match self {
     VString(s) => Some(s)
@@ -133,7 +137,7 @@ pub fn AttrValue::to_attr(self : AttrValue) -> String? {
 }
 
 ///|
-/// 由属性规格推导 `observedAttributes`：只有这里列出的属性名才会收到变更回调。
+/// Derive `observedAttributes` from the specs: only these names receive change callbacks.
 pub fn observed_attributes(specs : Array[AttrSpec]) -> Array[String] {
   let out : Array[String] = []
   for spec in specs {
@@ -189,10 +193,10 @@ fn ascii_to_lower(c : Char) -> Char {
 }
 
 ///|
-/// `max-count` → `maxCount`（ASCII kebab-case → camelCase）。
+/// `max-count` → `maxCount` (ASCII kebab-case to camelCase).
 ///
-/// 连续短横线只起一次大写作用（`a--b` → `aB`）；结尾短横线被忽略（`a-` → `a`）；
-/// 开头短横线会把首字母大写（`-a` → `A`）。
+/// Consecutive hyphens capitalize only once (`a--b` → `aB`); a trailing hyphen is
+/// ignored (`a-` → `a`); a leading hyphen capitalizes the first character (`-a` → `A`).
 pub fn kebab_to_camel(name : String) -> String {
   let out : Array[Char] = []
   let n = name.char_length()
@@ -217,9 +221,10 @@ pub fn kebab_to_camel(name : String) -> String {
 }
 
 ///|
-/// `maxCount` → `max-count`（ASCII camelCase → kebab-case）。
+/// `maxCount` → `max-count` (ASCII camelCase to kebab-case).
 ///
-/// 每个大写字母前插一个短横线，首字符除外（`MaxCount` → `max-count`）。
+/// Inserts a hyphen before every uppercase character except the first
+/// (`MaxCount` → `max-count`).
 pub fn camel_to_kebab(name : String) -> String {
   let out : Array[Char] = []
   let n = name.char_length()
@@ -243,10 +248,11 @@ pub fn camel_to_kebab(name : String) -> String {
 }
 
 ///|
-/// 严格解析十进制整数。
+/// Parse a strict decimal integer.
 ///
-/// 接受：可选 `+`/`-`，随后 1–9 位十进制数字。前导零允许（`007` → 7）。
-/// 拒绝：空串、只有符号、空白、下划线、小数点、科学计数法、10 位及以上的数字。
+/// Accepts an optional `+`/`-` followed by 1–9 decimal digits; leading zeros are allowed
+/// (`007` → 7). Rejects empty input, a sign alone, whitespace, underscores, decimal
+/// points, scientific notation, and 10 or more digits.
 pub fn parse_int(s : String) -> Int32? {
   let n = s.char_length()
   if n == 0 {
@@ -295,13 +301,16 @@ pub fn parse_int(s : String) -> Int32? {
 }
 
 ///|
-/// 严格解析十进制小数。
+/// Parse a strict decimal number.
 ///
-/// 接受：可选 `+`/`-`，整数部分 0–9 位，可选 `.` 加 1–9 位小数；整数与小数部分
-/// 加起来至少 1 位（所以 `.5` 与 `5` 合法，`.`、`5.` 非法）。
-/// 拒绝：空白、科学计数法（`1e3`）、十六进制、多个小数点、小数超过 9 位。
+/// Accepts an optional `+`/`-`, 0–9 integer digits, and an optional `.` followed by 1–9
+/// fractional digits; integer and fractional digits together must number at least 1
+/// (so `.5` and `5` are valid, while `.` and `5.` are not). Rejects whitespace,
+/// scientific notation (`1e3`), hexadecimal, multiple decimal points, and more than 9
+/// fractional digits.
 ///
-/// 小数部分先按整数累加、最后只做一次除法，以减少累积误差。
+/// The fractional part accumulates as an integer and is divided once at the end, which
+/// limits accumulated rounding error.
 pub fn parse_double(s : String) -> Double? {
   let n = s.char_length()
   if n == 0 {

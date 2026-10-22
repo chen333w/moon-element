@@ -1,9 +1,9 @@
 ///|
-/// CSS 作用域化的黑盒测试：用内联快照钉住改写结果。
-/// 刷新快照：`moon test --update`。
+/// Black-box tests for CSS scoping, pinning the rewrite with inline snapshots.
+/// Refresh snapshots: `moon test --update`.
 
 ///|
-test "scope_css: 普通规则加后代前缀" {
+test "scope_css: a plain rule gets a descendant prefix" {
   inspect(
     @core.scope_css("p { color: red }", ".x"),
     content=".x p { color: red }",
@@ -11,7 +11,7 @@ test "scope_css: 普通规则加后代前缀" {
 }
 
 ///|
-test "scope_css: 逗号分隔的选择器逐个处理" {
+test "scope_css: comma-separated selectors are scoped one by one" {
   inspect(
     @core.scope_css("p, a { color: red }", ".x"),
     content=".x p, .x a { color: red }",
@@ -19,7 +19,7 @@ test "scope_css: 逗号分隔的选择器逐个处理" {
 }
 
 ///|
-test "scope_css: 括号内的逗号不是分隔符" {
+test "scope_css: a comma inside parentheses is not a separator" {
   inspect(
     @core.scope_css("a:is(b, c) p { color: red }", ".x"),
     content=".x a:is(b, c) p { color: red }",
@@ -27,7 +27,7 @@ test "scope_css: 括号内的逗号不是分隔符" {
 }
 
 ///|
-test "scope_css: :host 被替换为 scope" {
+test "scope_css: :host is replaced by the scope" {
   inspect(
     @core.scope_css(":host { display: block }", "my-el"),
     content="my-el { display: block }",
@@ -43,7 +43,7 @@ test "scope_css: :host 被替换为 scope" {
 }
 
 ///|
-test "scope_css: @media 内部递归处理" {
+test "scope_css: @media contents are scoped recursively" {
   inspect(
     @core.scope_css("@media (min-width: 600px) { p { color: red } }", ".x"),
     content="@media (min-width: 600px) { .x p { color: red } }",
@@ -51,7 +51,7 @@ test "scope_css: @media 内部递归处理" {
 }
 
 ///|
-test "scope_css: @keyframes 原样保留（帧选择器不能加前缀）" {
+test "scope_css: @keyframes is kept verbatim (frame selectors must not be prefixed)" {
   inspect(
     @core.scope_css(
       "@keyframes spin { from { opacity: 0 } to { opacity: 1 } }", ".x",
@@ -61,15 +61,15 @@ test "scope_css: @keyframes 原样保留（帧选择器不能加前缀）" {
 }
 
 ///|
-test "scope_css: 注释保留" {
+test "scope_css: comments are preserved" {
   inspect(
-    @core.scope_css("/* 说明 */ p { color: red }", ".x"),
-    content="/* 说明 */ .x p { color: red }",
+    @core.scope_css("/* note */ p { color: red }", ".x"),
+    content="/* note */ .x p { color: red }",
   )
 }
 
 ///|
-test "scope_css: 选择器空白被归一化" {
+test "scope_css: selector whitespace is normalized" {
   inspect(
     @core.scope_css("p   >   a { color: red }", ".x"),
     content=".x p > a { color: red }",
@@ -81,7 +81,7 @@ test "scope_css: 选择器空白被归一化" {
 }
 
 ///|
-test "scope_css: 多条规则与 at-statement" {
+test "scope_css: several rules and an at-statement" {
   inspect(
     @core.scope_css("p { a: b } a { c: d }", ".x"),
     content=".x p { a: b } .x a { c: d }",
@@ -93,13 +93,13 @@ test "scope_css: 多条规则与 at-statement" {
 }
 
 ///|
-test "scope_css: 空 scope 是恒等操作，空输入返回空" {
+test "scope_css: an empty scope is the identity, empty input returns empty" {
   inspect(@core.scope_css("p { color: red }", ""), content="p { color: red }")
   inspect(@core.scope_css("", ".x"), content="")
 }
 
 ///|
-test "scope_css: at-rule 名大小写不敏感（@MEDIA 也要递归处理）" {
+test "scope_css: at-rule names are case-insensitive (@MEDIA is scoped too)" {
   inspect(
     @core.scope_css("@MEDIA (min-width: 600px) { p { color: red } }", ".x"),
     content="@MEDIA (min-width: 600px) { .x p { color: red } }",
@@ -111,7 +111,7 @@ test "scope_css: at-rule 名大小写不敏感（@MEDIA 也要递归处理）" {
 }
 
 ///|
-test "scope_css: :host 括号内嵌套括号原样保留" {
+test "scope_css: nested parentheses inside :host are kept verbatim" {
   // :host(:is(.a, .b)) → my-el:is(.a, .b)
   inspect(
     @core.scope_css(":host(:is(.a, .b)) { color: red }", "my-el"),
@@ -120,6 +120,6 @@ test "scope_css: :host 括号内嵌套括号原样保留" {
 }
 
 ///|
-test "scope_css: 空的逗号段不产出多余前缀" {
+test "scope_css: an empty comma segment produces no extra prefix" {
   inspect(@core.scope_css(", p { a: b }", ".x"), content=", .x p { a: b }")
 }

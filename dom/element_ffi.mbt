@@ -17,8 +17,8 @@ pub extern "js" fn install_dom_stub() -> Unit =
   #|  if (typeof globalThis.customElements === "undefined") {
   #|    globalThis.__moon_element_registry = Object.create(null);
   #|    globalThis.HTMLElement = class HTMLElement {};
-  #|    // 真实的 HTMLElement 有 attachShadow；stub 也要有，否则适配层的
-  #|    // shadow DOM 路径在无浏览器环境下无法测试。
+  #|    // The real HTMLElement has attachShadow, so the stub needs one too;
+  #|    // otherwise the adapter shadow DOM path cannot be tested headlessly.
   #|    globalThis.HTMLElement.prototype.attachShadow = function (opts) {
   #|      this.shadowRoot = {
   #|        innerHTML: "",
@@ -35,8 +35,9 @@ pub extern "js" fn install_dom_stub() -> Unit =
   #|        return globalThis.__moon_element_registry[name];
   #|      },
   #|    };
-  #|    // 事件相关的三个东西：CustomEvent、addEventListener、dispatchEvent。
-  #|    // 只实现适配层与测试需要的最小子集（同步派发、不实现捕获/冒泡路径传播）。
+  #|    // The three event pieces: CustomEvent, addEventListener, dispatchEvent.
+  #|    // Only the minimal subset the adapter and tests need (synchronous dispatch;
+  #|    // no capture or bubble path propagation).
   #|    globalThis.CustomEvent = class CustomEvent {
   #|      constructor(type, init) {
   #|        this.type = type;
@@ -63,7 +64,7 @@ pub extern "js" fn install_dom_stub() -> Unit =
   #|      for (const fn of list) {
   #|        fn(ev);
   #|      }
-  #|      // 浏览器语义：返回 false 表示有监听者取消了默认行为
+  #|      // Browser semantics: returning false means a listener canceled the default action
   #|      return !ev.defaultPrevented;
   #|    };
   #|  }
