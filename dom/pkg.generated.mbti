@@ -6,7 +6,7 @@ import {
 }
 
 // Values
-pub fn define_component(String, Array[@core.AttrSpec], (@core.Props) -> @core.View, events? : Array[@core.EventSpec], on_change? : (Int32, String) -> Unit, styles? : String, mode? : RenderMode) -> Unit
+pub fn define_component(String, Array[@core.AttrSpec], (@core.Props) -> @core.View, events? : Array[@core.EventSpec], on_change? : (Int32, String) -> Unit, styles? : String, mode? : @core.RenderMode) -> Unit
 
 pub fn define_element(String, () -> Unit) -> Unit
 
@@ -59,12 +59,6 @@ pub fn probe_shadow_html(Int32) -> String
 // Errors
 
 // Types and methods
-pub(all) enum RenderMode {
-  ShadowDom
-  LightDom
-} derive(Eq)
-pub fn RenderMode::equal(Self, Self) -> Bool
-pub fn RenderMode::not_equal(Self, Self) -> Bool
 
 // Type aliases
 

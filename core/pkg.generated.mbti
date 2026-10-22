@@ -8,7 +8,7 @@ import {
 // Values
 pub fn camel_to_kebab(String) -> String
 
-pub fn component_skeleton(String) -> String?
+pub fn component_skeleton(String, mode? : RenderMode) -> String?
 
 pub fn escape_text(String) -> String
 
@@ -136,6 +136,16 @@ pub(all) enum Reaction {
   ReactAdopted
 } derive(@debug.Debug)
 pub fn Reaction::to_repr(Self) -> @debug.Repr
+
+pub(all) enum RenderMode {
+  ShadowDom
+  LightDom
+} derive(Eq, @debug.Debug)
+pub fn RenderMode::equal(Self, Self) -> Bool
+pub fn RenderMode::name(Self) -> String
+pub fn RenderMode::not_equal(Self, Self) -> Bool
+pub fn RenderMode::parse(String) -> Self?
+pub fn RenderMode::to_repr(Self) -> @debug.Repr
 
 pub(all) enum View {
   VText(String)

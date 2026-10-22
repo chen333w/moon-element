@@ -67,3 +67,26 @@ test "component_skeleton: 生成内容包含标签名、标识符与事件声明
   assert_true(code.contains("\"chen333w/moon-element/core\" @core"))
   assert_true(code.contains("\"chen333w/moon-element/dom\" @dom"))
 }
+
+///|
+test "component_skeleton: light 模式生成 mode 与 styles 声明" {
+  let code = @core.component_skeleton("x-light-panel", mode=@core.LightDom).unwrap_or(
+    "",
+  )
+  assert_true(code.contains("渲染模式：light"))
+  assert_true(code.contains("mode=@core.LightDom,"))
+  assert_true(code.contains("styles=X_LIGHT_PANEL_CSS,"))
+  // 生成器同时给出 CSS 常量（const 要求大写标识符）
+  assert_true(code.contains("const X_LIGHT_PANEL_CSS : String ="))
+  // light 模式要提示不建 shadow root
+  assert_true(code.contains("不建 shadow root"))
+}
+
+///|
+test "component_skeleton: shadow 模式不写 mode，但同样给 styles" {
+  let code = @core.component_skeleton("x-badge-v2").unwrap_or("")
+  assert_true(code.contains("渲染模式：shadow"))
+  assert_true(code.contains("styles=X_BADGE_V2_CSS,"))
+  assert_false(code.contains("mode=@core.LightDom,"))
+  assert_true(code.contains("`:host` 可用"))
+}

@@ -128,18 +128,25 @@ pub fn tag_to_snake(tag : String) -> String {
 }
 
 ///|
-/// 生成一个组件骨架的 MoonBit 源码。
-///
-/// 标签名非法时返回 `None`（而不是生成一份跑不起来的代码）。
-pub fn component_skeleton(tag : String) -> String? {
+pub fn component_skeleton(
+  tag : String,
+  mode~ : RenderMode = ShadowDom,
+) -> String? {
   if !validate_tag_name(tag) {
     return None
   }
   let snake = tag_to_snake(tag)
+  // CSS 常量的名字：my-widget → MY_WIDGET_CSS（const 要求大写标识符）
+  let css_name = snake.to_upper() + "_CSS"
+  let mode_name = mode.name()
+  let is_light = match mode {
+    LightDom => true
+    ShadowDom => false
+  }
   // 用逐行拼接而不是 `#|` 多行字面量：`#|` 块是原始文本，不做 `\{...}` 插值，
   // 写在那里会生成字面量 `\{tag}` 这种坏代码。
   let lines : Array[String] = [
-    "// 由 moon-element CLI 生成的自定义元素骨架：\{tag}",
+    "// 由 moon-element CLI 生成的自定义元素骨架：\{tag}（渲染模式：\{mode_name}）",
     "//",
     "// 使用方式：",
     "// 1) 在本包的 moon.pkg 里声明依赖（import 属于包配置，不能写进 .mbt）：",
@@ -148,27 +155,54 @@ pub fn component_skeleton(tag : String) -> String? {
     "//        \"chen333w/moon-element/dom\" @dom,",
     "//      }",
     "// 2) 把本文件放进包里，并在入口处调用 register_\{snake}()",
-    "// 3) 产物是标准自定义元素：宿主页面里写 <\{tag}> 即可，渲染结果在 shadow root 内",
-    "",
-    "///|",
-    "fn render_\{snake}(props : @core.Props) -> @core.View {",
-    "  let label = props.get_string(\"label\").unwrap_or(\"\")",
-    "  @core.View::element(\"span\", [], [@core.View::text(label)])",
-    "}",
-    "",
-    "///|",
-    "pub fn register_\{snake}() -> Unit {",
-    "  @dom.define_component(",
-    "    \"\{tag}\",",
-    "    [@core.AttrSpec::string(\"label\", \"\")],",
-    "    render_\{snake},",
-    "    events=[",
-    "      // 需要让宿主页面收到的事件，用 crossing（bubbles + composed）",
-    "      @core.EventSpec::crossing(\"\{tag}-changed\"),",
-    "    ],",
-    "  )",
-    "}",
+    "// 3) 产物是标准自定义元素：宿主页面里写 <\{tag}> 即可",
   ]
+  if is_light {
+    lines.push(
+      "//    light 模式：不建 shadow root，内容渲染进元素自身；",
+    )
+    lines.push(
+      "//    下面的 CSS 会被 core.scope_css 作用域到 `\{tag}`，不会污染整页",
+    )
+  } else {
+    lines.push(
+      "//    shadow 模式：内容渲染进 shadow root，页面样式进不来；CSS 里的 `:host` 可用",
+    )
+  }
+  lines.push("")
+  lines.push("///|")
+  lines.push("const \{css_name} : String =")
+  lines.push("  #|:host { display: block; }")
+  lines.push("  #|.label { color: #3b4453; }")
+  lines.push("")
+  lines.push("///|")
+  lines.push("fn render_\{snake}(props : @core.Props) -> @core.View {")
+  lines.push("  let label = props.get_string(\"label\").unwrap_or(\"\")")
+  // 这一行刻意写成单行：生成器要产出**已格式化**的代码，否则 `moon fmt` 会把
+  // 多行调用合并，导致提交的示例与 CLI 原始产出不一致（CI 的漂移检查会红）
+  lines.push(
+    "  @core.View::element(\"span\", [(\"class\", \"label\")], [@core.View::text(label)])",
+  )
+  lines.push("}")
+  lines.push("")
+  lines.push("///|")
+  lines.push("pub fn register_\{snake}() -> Unit {")
+  lines.push("  @dom.define_component(")
+  lines.push("    \"\{tag}\",")
+  lines.push("    [@core.AttrSpec::string(\"label\", \"\")],")
+  lines.push("    render_\{snake},")
+  lines.push("    styles=\{css_name},")
+  if is_light {
+    lines.push("    mode=@core.LightDom,")
+  }
+  lines.push("    events=[")
+  lines.push(
+    "      // 需要让宿主页面收到的事件，用 crossing（bubbles + composed）",
+  )
+  lines.push("      @core.EventSpec::crossing(\"\{tag}-changed\"),")
+  lines.push("    ],")
+  lines.push("  )")
+  lines.push("}")
   // 行与行之间用 \n 连接，**结尾不留换行**：调用方用 println 输出到文件后
   // 恰好一个结尾换行，与 moon fmt 规范化后的结果一致。
   let mut out = ""

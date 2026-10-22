@@ -8,22 +8,6 @@
 /// 这里只需要测「接线是否接对了」。
 
 ///|
-/// 渲染模式。
-///
-/// - `ShadowDom`（默认）：渲染进 shadow root，样式天然隔离，`:host` 直接可用
-/// - `LightDom`：渲染进元素自身（不建 shadow root）。此时组件 CSS 会先用
-///   `core.scope_css` 作用域到标签名，避免污染整页 —— 用于 SSR 输出，
-///   或需要宿主页面样式透入的场合
-pub(all) enum RenderMode {
-  ShadowDom
-  LightDom
-} derive(Eq)
-
-///|
-/// `derive(Eq)` 生成的方法默认会被隐式提升为普通方法（已废弃行为），显式声明以消除警告。
-pub extend RenderMode with Eq::{equal, not_equal}
-
-///|
 /// 一个已注册组件的静态定义（同 tag 的所有实例共享）。
 priv struct ComponentDef {
   tag : String
@@ -31,7 +15,7 @@ priv struct ComponentDef {
   render_fn : (@core.Props) -> @core.View
   events : Array[@core.EventSpec]
   styles : String
-  mode : RenderMode
+  mode : @core.RenderMode
 }
 
 ///|
@@ -46,7 +30,7 @@ priv struct Instance {
   // 渲染时需要：light 模式下作为 scope_css 的作用域
   tag : String
   styles : String
-  mode : RenderMode
+  mode : @core.RenderMode
 }
 
 ///|
@@ -112,14 +96,14 @@ fn paint(id : Int32) -> Unit {
         // light 模式下组件的 CSS 会泄漏到整页，先用 scope_css 作用域到标签名；
         // shadow 模式保持原样（`:host` 在 shadow root 里才是有效的）
         let css = match inst.mode {
-          ShadowDom => inst.styles
-          LightDom => @core.scope_css(inst.styles, inst.tag)
+          @core.ShadowDom => inst.styles
+          @core.LightDom => @core.scope_css(inst.styles, inst.tag)
         }
         "<style>" + css + "</style>" + body
       }
       match inst.mode {
-        ShadowDom => js_set_shadow_html(id, html)
-        LightDom => js_set_inner_html(id, html)
+        @core.ShadowDom => js_set_shadow_html(id, html)
+        @core.LightDom => js_set_inner_html(id, html)
       }
     }
     None => ()
@@ -149,12 +133,12 @@ pub fn define_component(
   events~ : Array[@core.EventSpec] = [],
   on_change~ : (Int32, String) -> Unit = fn(_id, _name) { () },
   styles~ : String = "",
-  mode~ : RenderMode = ShadowDom,
+  mode~ : @core.RenderMode = @core.ShadowDom,
 ) -> Unit {
   let def : ComponentDef = { tag, specs, render_fn, events, styles, mode, }
   let use_shadow = match mode {
-    ShadowDom => true
-    LightDom => false
+    @core.ShadowDom => true
+    @core.LightDom => false
   }
   // FixedArray 是定长数组（没有 push），先分配再按下标写入
   let observed : FixedArray[String] = FixedArray::make(specs.length(), "")

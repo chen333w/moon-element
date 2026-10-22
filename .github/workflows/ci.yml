@@ -64,6 +64,8 @@ jobs:
         run: |
           moon run cmd/main -- x-counter > /tmp/generated-component.mbt
           diff -u examples/generated-x-counter/component.mbt /tmp/generated-component.mbt
+          moon run cmd/main -- x-light-panel --mode light > /tmp/generated-light.mbt
+          diff -u examples/generated-light-panel/component.mbt /tmp/generated-light.mbt
 
       # 构建 demo 产物并在 node 里验证它真的能跑（D0 假设 3 的持续验证）。
       - name: Build demo and verify the artifact headlessly

@@ -183,7 +183,7 @@ pub fn register_demo() -> Unit {
     ],
     panel_view,
     styles=PANEL_CSS,
-    mode=@dom.LightDom,
+    mode=@core.LightDom,
   )
 }
 

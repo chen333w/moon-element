@@ -192,7 +192,7 @@ test "adapter: light 模式不建 shadow root，并用 scope_css 把样式作用
     [@core.AttrSpec::string("label", "?")],
     render_light,
     styles=":host { display: block } p { color: red }",
-    mode=@dom.LightDom,
+    mode=@core.LightDom,
   )
   let id = @dom.probe_create("x-light-card")
   @dom.probe_connect(id)

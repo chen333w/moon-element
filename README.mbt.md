@@ -9,7 +9,7 @@
 （原生 HTML / React / Vue / 任何能写标签的地方），**不需要引入 MoonBit 侧的前端框架运行时**。
 
 > 状态：**核心可用**（2026-10-22）
-> CI 全绿 · 测试 wasm/wasm-gc/native **61/61**、js **85/85** · 库本体行覆盖 **96.3%**
+> CI 全绿 · 测试 wasm/wasm-gc/native **65/65**、js **90/90** · 库本体行覆盖 **96.5%**
 > （数字为 2026-10-22 快照，复现命令见下文；提交记录连续、数量 ≥10，不写死以免每次提交都漂）
 
 ## 为什么不是「又一个前端框架」
@@ -33,7 +33,7 @@
 | 样式声明 | `styles` 只写一次组件 CSS：shadow 模式原样注入，light 模式自动加作用域前缀 |
 | CSS 作用域 | `scope_css(css, scope)` 把 `:host` 样式表改写成前缀形式；light DOM 模式就是用它做隔离 |
 | 事件 | 声明式事件规格（`crossing` = `bubbles + composed`，可穿 shadow 边界到宿主页面）；`on_change` 回调里 `dispatch` 即可对外抛事件 |
-| CLI | `moon run cmd/main -- x-counter` 生成组件骨架；元素名按 HTML 规范校验 |
+| CLI | `moon run cmd/main -- x-counter` 生成组件骨架；`--mode shadow\|light` 选渲染模式；元素名按 HTML 规范校验 |
 
 ## 快速开始
 
@@ -93,18 +93,21 @@ node examples/demo/verify.mjs        # 16 项断言
 moon check --deny-warn --target all          # 全后端静态检查（警告即失败）
 moon test --target all --deny-warn           # 四个后端上都跑测试
 moon test --target js --enable-coverage && moon coverage report -f summary
-moon run cmd/main -- x-counter               # 生成组件骨架
+moon run cmd/main -- x-counter               # 生成组件骨架（shadow DOM）
+moon run cmd/main -- x-panel --mode light    # 生成 light DOM 骨架（样式用 scope_css 隔离）
 moon build --target js --release             # 产出浏览器可加载的 JS
 ```
 
 ## 架构：为什么切成 `core` 和 `dom`
 
 ```
-core/    目标无关的纯逻辑（属性反射、生命周期、Props、渲染、CSS 作用域、事件、元素名校验）
-dom/     js-only 适配层（真实 DOM 回调接线、shadow 渲染、CustomEvent 派发）
-examples/demo/     三个真实组件 + 可交互页面 + 无头验证脚本
-examples/generated-x-counter/   CLI 生成器的产物（提交进仓库，由 CI 编译验证）
-cmd/main/          CLI
+core/    目标无关的纯逻辑（属性反射、生命周期、Props、渲染、CSS 作用域、事件、
+         渲染模式、元素名校验、骨架生成）
+dom/     js-only 适配层（真实 DOM 回调接线、shadow / light 两种渲染、CustomEvent 派发）
+examples/demo/                 四个真实组件 + 可交互页面 + 无头验证脚本
+examples/generated-x-counter/      CLI 产物：shadow 模式（提交进仓库，由 CI 编译与漂移检查验证）
+examples/generated-light-panel/    CLI 产物：light 模式（同上）
+cmd/main/          CLI（--mode shadow|light）
 ```
 
 规则都在 `core`，适配层只负责接线。这样切的好处是**可测性**：属性解析、回退语义、
@@ -113,13 +116,16 @@ cmd/main/          CLI
 
 ## 测试与质量
 
-- **四后端单元测试**：61/61（wasm、wasm-gc、native）+ 85/85（js）
+- **四后端单元测试**：65/65（wasm、wasm-gc、native）+ 90/90（js）
 - **无浏览器也能测 DOM 行为**：`install_dom_stub()` 提供一个最小 DOM 桩（含 `attachShadow`、
   `CustomEvent`、事件派发），因此适配层逻辑在 node 下就能测，**不引入 jsdom/happy-dom 等 npm 依赖**
 - **产物级验证**：`examples/demo/verify.mjs` 直接 import 构建产物（浏览器加载的同一份文件）跑 **16 项断言**
 - **生成器漂移检查**：仓库里的示例必须与 CLI 当前产出逐字节一致，忘了重新生成 CI 就会红
 - **接口漂移检查**：`moon info` 后校验 `.mbti` 无 diff、无未提交接口文件
-- **覆盖率**：库本体（`core` + `dom`）行覆盖 **96.3%**（650/675）；计入 CLI 入口与 demo 的整仓数字为 83.8%（650/776）——后两者是集成路径，由「构建产物验证 + 生成器漂移检查 + CI 编译」覆盖，不计入单元测试分母
+- **覆盖率**：库本体（`core` + `dom`）行覆盖 **96.5%**（688/713）；整仓 83.9%（704/839）。
+  逐包数字（`moon coverage report -f html -o /tmp/cov-html`）：`core/` 95.9%（568/592）、
+  `dom/` 99.2%（120/121）、生成器产物示例各 **100%**（8/8，由各自的端到端测试覆盖）；
+  未计入的是集成路径——CLI 入口（0/30）与 demo（0/80），由「产物级验证 + 生成器漂移检查 + CI 编译」覆盖
 
 ## 已知限制
 
