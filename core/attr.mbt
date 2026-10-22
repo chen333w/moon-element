@@ -9,7 +9,14 @@ pub(all) enum AttrKind {
   AttrInt
   AttrDouble
   AttrBool
-}
+} derive(Eq, @debug.Debug)
+
+///|
+/// `derive` 生成的方法默认会被隐式提升为普通方法（已废弃行为），显式声明以消除警告。
+pub extend AttrKind with Eq::{equal, not_equal}
+
+///|
+pub extend AttrKind with @debug.Debug::{to_repr}
 
 ///|
 /// 属性的值。

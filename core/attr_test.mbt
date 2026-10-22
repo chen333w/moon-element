@@ -174,3 +174,13 @@ test "observed_attributes 只列出被声明的属性" {
   ]
   assert_eq(@core.observed_attributes(specs), ["label", "max-count", "disabled"])
 }
+
+///|
+test "AttrSpec::kind 与 default_value 可读（供适配层与调试使用）" {
+  assert_eq(@core.AttrSpec::string("a", "").kind(), @core.AttrString)
+  assert_eq(@core.AttrSpec::int("b", 1).kind(), @core.AttrInt)
+  assert_eq(@core.AttrSpec::double("c", 1.0).kind(), @core.AttrDouble)
+  assert_eq(@core.AttrSpec::bool("d", false).kind(), @core.AttrBool)
+  assert_eq(@core.AttrSpec::int("b", 1).default_value(), @core.VInt(1))
+  assert_eq(@core.AttrSpec::string("a", "x").attr_name(), "a")
+}

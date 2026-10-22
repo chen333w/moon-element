@@ -155,3 +155,24 @@ test "adapter: on_change 在状态更新后触发，可用于派发对外事件"
   // 回调在渲染之后：此时读到的 DOM 已经是新值
   assert_eq(@dom.probe_shadow_html(id), "<span class=\"badge\">x:5</span>")
 }
+
+///|
+test "adapter: 无效实例 id 的诊断查询返回空，不抛错" {
+  @dom.install_dom_stub()
+  assert_eq(@dom.instance_reaction_log(9999), [])
+  assert_eq(@dom.instance_event_log(9999), [])
+  assert_eq(@dom.instance_event_names(9999), [])
+  assert_true(@dom.instance_prop(9999, "label") is None)
+  assert_true(@dom.instance_prop_string(9999, "label") is None)
+  assert_true(@dom.instance_prop_int(9999, "label") is None)
+}
+
+///|
+test "adapter: 未连接就断开（元素已创建但从未触发过回调）不产生反应" {
+  @dom.install_dom_stub()
+  @dom.define_component("x-never-connected", specs(), render_badge)
+  let id = @dom.probe_create("x-never-connected")
+  // 这个实例在 MoonBit 侧还不存在，disconnectedCallback 不应抛错
+  @dom.probe_disconnect(id)
+  assert_eq(@dom.instance_reaction_log(id), [])
+}

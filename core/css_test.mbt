@@ -97,3 +97,29 @@ test "scope_css: 空 scope 是恒等操作，空输入返回空" {
   inspect(@core.scope_css("p { color: red }", ""), content="p { color: red }")
   inspect(@core.scope_css("", ".x"), content="")
 }
+
+///|
+test "scope_css: at-rule 名大小写不敏感（@MEDIA 也要递归处理）" {
+  inspect(
+    @core.scope_css("@MEDIA (min-width: 600px) { p { color: red } }", ".x"),
+    content="@MEDIA (min-width: 600px) { .x p { color: red } }",
+  )
+  inspect(
+    @core.scope_css("@KeyFrames spin { from { opacity: 0 } }", ".x"),
+    content="@KeyFrames spin { from { opacity: 0 } }",
+  )
+}
+
+///|
+test "scope_css: :host 括号内嵌套括号原样保留" {
+  // :host(:is(.a, .b)) → my-el:is(.a, .b)
+  inspect(
+    @core.scope_css(":host(:is(.a, .b)) { color: red }", "my-el"),
+    content="my-el:is(.a, .b) { color: red }",
+  )
+}
+
+///|
+test "scope_css: 空的逗号段不产出多余前缀" {
+  inspect(@core.scope_css(", p { a: b }", ".x"), content=", .x p { a: b }")
+}
