@@ -32,10 +32,24 @@ node examples/demo/verify.mjs
 | 2 · 徽章 | **shadow DOM 样式隔离**：页面给 `.pill` / `span` 定了很霸道的样式，组件内部完全不受影响 |
 | 3 · 转义 | 把 `label` 设成 `<b>加粗</b>`，渲染出来是**字面文本**，不会被当标签执行 |
 | 4 · 卡片 | 组合结构 + 实时更新（输入框改 `body` 属性） |
+| 5 · light DOM 面板 | **不用 shadow DOM 的隔离**：`mode=LightDom` + `styles`，适配层用 `scope_css` 把选择器前缀成 `x-panel ...` |
 
 数据流是单向的：**页面改属性 → 组件重渲染 → 组件抛事件 → 页面收到**。
 组件内部不挂 DOM 监听器（渲染用 `innerHTML` 替换，内部监听器会随重渲染丢失），
 所以交互按钮放在页面（light DOM）里。
+
+## 两种隔离模式的机制差别（重要）
+
+| | shadow DOM（默认） | light DOM |
+| --- | --- | --- |
+| 隔离方式 | **结构性**：页面 CSS 根本进不到 shadow root | **优先级**：选择器被前缀成 `x-panel .pill`，优先级高于页面 `.pill` |
+| `:host` | 直接可用 | 由 `scope_css` 改写成标签名 |
+| 页面 `!important` | 无效（进不来） | **有效**（会压过组件规则） |
+| 页面普通规则 | 无效 | 直接命中的仍会生效（例如 `span { letter-spacing }`） |
+| 适用 | 组件样式完全自治 | SSR 输出、需要宿主样式透入 |
+
+理解这条差别，就不会把 light DOM 当成"shadow DOM 的等价替代"。页面第 5 节
+把这一点也写在页面上了。
 
 ## 一个实测结论：`link.js.format` 对可执行包是 no-op
 

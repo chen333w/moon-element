@@ -111,7 +111,9 @@ const PANEL_CSS : String =
   #|:host { display: block; margin-top: 8px; }
   #|.panel-title { font-weight: 600; color: #12457f; }
   #|.panel-body { color: #3b4453; }
-  #|.pill { background: #eef2f7; }   /* 故意与页面里的 .pill 同名 */
+  #|/* 故意与页面里的 .pill 同名；background 与 color 都要自己定，
+  #|   否则页面的 color:#fff 会透入，变成浅底白字 */
+  #|.pill { background: #eef2f7; color: #3b4453; }
 
 ///|
 fn panel_view(props : @core.Props) -> @core.View {

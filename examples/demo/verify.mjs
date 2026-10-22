@@ -180,7 +180,7 @@ if (typeof registry["x-panel"] === "function") {
   );
   check(
     "普通选择器也加了标签名前缀（不会污染页面的 .pill）",
-    panel.innerHTML.includes("x-panel .pill { background: #eef2f7; }"),
+    panel.innerHTML.includes("x-panel .pill { background: #eef2f7; color: #3b4453; }"),
   );
   panel.attributeChangedCallback("body", null, "更新");
   check("light 模式属性变化同样重渲染", panel.innerHTML.includes("更新"));

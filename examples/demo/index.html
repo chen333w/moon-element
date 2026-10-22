@@ -25,8 +25,11 @@
          color: #cbd5e1; border-radius: 10px; padding: 12px; min-height: 92px; white-space: pre-wrap; }
   .err { background: #ffe9e9; border: 1px solid #ffc9c9; color: #8f1d1d; padding: 12px;
          border-radius: 10px; margin-bottom: 16px; }
-  /* 这个规则只该影响页面里的 .pill，不该影响组件内部的 .pill */
-  .pill { background: hotpink !important; color: #fff !important; padding: 6px 10px;
+  /* 页面样式。注意这里**故意不用 !important**：
+     shadow DOM 是结构性隔离，页面规则根本进不去；
+     而 light DOM 的隔离靠选择器前缀提高优先级，压不过页面的 !important。
+     两种模式的差别就在这——第 5 节有说明。 */
+  .pill { background: hotpink; color: #fff; padding: 6px 10px;
           border-radius: 999px; font-size: 13px; }
   span { letter-spacing: .3em; }
 </style>
@@ -101,9 +104,15 @@
       <span class="pill">页面里的 .pill（被页面样式染成粉色）</span>
     </div>
     <p class="note">
-      对比很直观：组件里的 <code>.pill</code> 是浅灰底（选择器被改写成 <code>x-panel .pill</code>），
-      页面里的 <code>.pill</code> 仍是粉色。<strong>没有 shadow DOM 也做到了互不污染</strong>，
-      代价是选择器会被加前缀。适用于 SSR 输出、或需要宿主样式透入的场合。
+      对比很直观：组件里的 <code>.pill</code> 是浅灰底（选择器被改写成 <code>x-panel .pill</code>，
+      优先级高于页面的 <code>.pill</code>），页面里的 <code>.pill</code> 仍是粉色。
+    </p>
+    <p class="note">
+      <strong>但机制不同，边界也不同</strong>：shadow DOM 是<em>结构性隔离</em>，页面规则根本进不去；
+      light DOM 的隔离只是<em>用前缀提高优先级</em>——所以本页的
+      <code>span { letter-spacing: .3em }</code> 仍会透进组件（组件里的 <code>&lt;span&gt;</code> 同样被拉开间距），
+      页面若用 <code>!important</code> 也能压过组件规则。light DOM 适合 SSR 输出、
+      或本来就想让宿主样式透入的场合。
     </p>
   </section>
 
