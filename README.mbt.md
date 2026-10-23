@@ -2,6 +2,7 @@
 
 [![ci](https://github.com/chen333w/moon-element/actions/workflows/ci.yml/badge.svg)](https://github.com/chen333w/moon-element/actions/workflows/ci.yml)
 [![license](https://img.shields.io/badge/license-Apache--2.0-blue.svg)](LICENSE)
+[![mooncakes](https://img.shields.io/badge/mooncakes-chen333w%2Fmoon--element-blue.svg)](https://mooncakes.io/docs/chen333w/moon-element)
 
 Standard Web Components in [MoonBit](https://www.moonbitlang.com/). Components register with
 `customElements.define`, so they work in any page or framework without a MoonBit-side runtime.
@@ -10,8 +11,11 @@ This is not a frontend framework: it does not own the page, it just provides cus
 ## Quick start
 
 ```bash
-curl -fsSL https://cli.moonbitlang.com/install/unix.sh | bash
+curl -fsSL https://cli.moonbitlang.com/install/unix.sh | bash   # MoonBit toolchain
+moon add chen333w/moon-element                                  # this package
 ```
+
+Published on [mooncakes.io](https://mooncakes.io/docs/chen333w/moon-element).
 
 A component (from [`examples/demo/main.mbt`](examples/demo/main.mbt)):
 
