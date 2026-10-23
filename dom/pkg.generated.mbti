@@ -6,7 +6,7 @@ import {
 }
 
 // Values
-pub fn define_component(String, Array[@core.AttrSpec], (@core.Props) -> @core.View, events? : Array[@core.EventSpec], on_change? : (Int32, String) -> Unit, styles? : String, mode? : @core.RenderMode) -> Unit
+pub fn define_component(String, Array[@core.AttrSpec], (@core.Props) -> @core.View, events? : Array[@core.EventSpec], on_change? : (Int32, String) -> Unit, styles? : String, mode? : @core.RenderMode, on_action? : Array[(@core.ActionSpec, (Int32, String) -> Unit)]) -> Unit
 
 pub fn define_element(String, () -> Unit) -> Unit
 
@@ -15,6 +15,8 @@ pub fn dispatch(Int32, String, String, Bool) -> Bool
 pub fn fire_connected(String) -> Unit
 
 pub fn install_dom_stub() -> Unit
+
+pub fn instance_action_log(Int32) -> Array[String]
 
 pub fn instance_event_log(Int32) -> Array[String]
 
@@ -44,6 +46,8 @@ pub fn probe_create(String) -> Int32
 
 pub fn probe_disconnect(Int32) -> Unit
 
+pub fn probe_fire_action(Int32, String, String) -> Unit
+
 pub fn probe_inner_html(Int32) -> String
 
 pub fn probe_listener_log(Int32) -> Array[String]
@@ -55,6 +59,10 @@ pub fn probe_remove_attribute(Int32, String) -> Unit
 pub fn probe_set_attribute(Int32, String, String) -> Unit
 
 pub fn probe_shadow_html(Int32) -> String
+
+pub fn remove_attribute(Int32, String) -> Unit
+
+pub fn set_attribute(Int32, String, String) -> Unit
 
 // Errors
 

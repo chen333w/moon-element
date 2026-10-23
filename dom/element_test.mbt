@@ -232,3 +232,158 @@ test "adapter: no styles means no empty style tag" {
   @dom.probe_connect(id)
   inspect(@dom.probe_shadow_html(id), content="<p>?</p>")
 }
+
+///|
+let action_seen : Array[String] = []
+
+///|
+fn record_action(_id : Int32, action : String) -> Unit {
+  action_seen.push(action)
+}
+
+///|
+fn counter_view_for_actions(props : @core.Props) -> @core.View {
+  @core.View::element("div", [], [
+    @core.View::element("button", [("data-act", "dec")], [@core.View::text("-")]),
+    @core.View::text(props.get_int("count").unwrap_or(0).to_string()),
+    @core.View::element("button", [("data-act", "inc")], [@core.View::text("+")]),
+  ])
+}
+
+///|
+test "adapter: actions are handled through a listener on the shadow root" {
+  @dom.install_dom_stub()
+  action_seen.clear()
+  @dom.define_component(
+    "x-action-counter",
+    [@core.AttrSpec::int("count", 0)],
+    counter_view_for_actions,
+    on_action=[
+      (@core.ActionSpec::new("click", "inc"), record_action),
+      (@core.ActionSpec::new("click", "dec"), record_action),
+    ],
+  )
+  let id = @dom.probe_create("x-action-counter")
+  @dom.probe_connect(id)
+  // the rendered content marks the buttons
+  assert_true(@dom.probe_shadow_html(id).contains("data-act=\"inc\""))
+  @dom.probe_fire_action(id, "click", "inc")
+  @dom.probe_fire_action(id, "click", "dec")
+  assert_eq(@dom.instance_action_log(id), ["click:inc", "click:dec"])
+  assert_eq(action_seen, ["inc", "dec"])
+  // an event with no data-act in the tree runs nothing
+  @dom.probe_fire_action(id, "click", "")
+  assert_eq(@dom.instance_action_log(id).length(), 2)
+  // an event type with no binding is not listened for
+  @dom.probe_fire_action(id, "input", "inc")
+  assert_eq(@dom.instance_action_log(id).length(), 2)
+}
+
+///|
+test "adapter: light mode binds actions to the host element" {
+  @dom.install_dom_stub()
+  action_seen.clear()
+  @dom.define_component(
+    "x-action-light",
+    [],
+    fn(_props) {
+      @core.View::element("button", [("data-act", "go")], [
+        @core.View::text("go"),
+      ])
+    },
+    styles=":host { display: block }",
+    mode=@core.LightDom,
+    on_action=[(@core.ActionSpec::new("click", "go"), record_action)],
+  )
+  let id = @dom.probe_create("x-action-light")
+  @dom.probe_connect(id)
+  assert_eq(@dom.probe_shadow_html(id), "")
+  @dom.probe_fire_action(id, "click", "go")
+  assert_eq(@dom.instance_action_log(id), ["click:go"])
+  assert_eq(action_seen, ["go"])
+}
+
+///|
+test "adapter: invalid or duplicate action specs are dropped" {
+  @dom.install_dom_stub()
+  action_seen.clear()
+  @dom.define_component(
+    "x-action-invalid",
+    [],
+    fn(_props) { @core.View::text("x") },
+    on_action=[
+      (@core.ActionSpec::new("click", "ok"), record_action),
+      // the same pair twice
+      (@core.ActionSpec::new("click", "ok"), record_action),
+      // action containing a space
+      (@core.ActionSpec::new("click", "not ok"), record_action),
+      // event type containing a space
+      (@core.ActionSpec::new("cli ck", "x"), record_action),
+    ],
+  )
+  let id = @dom.probe_create("x-action-invalid")
+  @dom.probe_connect(id)
+  @dom.probe_fire_action(id, "click", "ok")
+  assert_eq(@dom.instance_action_log(id), ["click:ok"])
+  assert_eq(action_seen, ["ok"])
+  @dom.probe_fire_action(id, "click", "not ok")
+  assert_eq(@dom.instance_action_log(id).length(), 1)
+}
+
+///|
+fn count_view(props : @core.Props) -> @core.View {
+  @core.View::element("span", [], [
+    @core.View::text(props.get_int("count").unwrap_or(0).to_string()),
+  ])
+}
+
+///|
+test "adapter: set_attribute and remove_attribute drive the attribute pipeline" {
+  @dom.install_dom_stub()
+  @dom.define_component(
+    "x-self-update",
+    [@core.AttrSpec::int("count", 0)],
+    count_view,
+  )
+  let id = @dom.probe_create("x-self-update")
+  @dom.probe_connect(id)
+  assert_true(@dom.probe_shadow_html(id).contains(">0<"))
+  @dom.set_attribute(id, "count", "7")
+  assert_true(@dom.probe_shadow_html(id).contains(">7<"))
+  assert_eq(@dom.instance_prop_int(id, "count"), Some(7))
+  // removing falls back to the spec default
+  @dom.remove_attribute(id, "count")
+  assert_eq(@dom.instance_prop_int(id, "count"), Some(0))
+  // an unknown instance is a no-op, not a crash
+  @dom.set_attribute(99999, "count", "1")
+  @dom.remove_attribute(99999, "count")
+}
+
+///|
+/// Increments the component's own attribute; this is what makes in-component buttons work.
+fn increment_own_count(id : Int32, _action : String) -> Unit {
+  let next = @dom.instance_prop_int(id, "count").unwrap_or(0) + 1
+  @dom.set_attribute(id, "count", next.to_string())
+}
+
+///|
+test "adapter: an action handler can update the component's own attribute" {
+  @dom.install_dom_stub()
+  @dom.define_component(
+    "x-self-counter",
+    [@core.AttrSpec::int("count", 0)],
+    fn(_props) {
+      @core.View::element("button", [("data-act", "inc")], [
+        @core.View::text("+"),
+      ])
+    },
+    on_action=[(@core.ActionSpec::new("click", "inc"), increment_own_count)],
+  )
+  let id = @dom.probe_create("x-self-counter")
+  @dom.probe_connect(id)
+  assert_eq(@dom.instance_prop_int(id, "count"), Some(0))
+  @dom.probe_fire_action(id, "click", "inc")
+  assert_eq(@dom.instance_prop_int(id, "count"), Some(1))
+  @dom.probe_fire_action(id, "click", "inc")
+  assert_eq(@dom.instance_prop_int(id, "count"), Some(2))
+}

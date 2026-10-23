@@ -9,12 +9,28 @@ pub extern "js" fn install_dom_stub() -> Unit =
   #|  if (typeof globalThis.customElements === "undefined") {
   #|    globalThis.__moon_element_registry = Object.create(null);
   #|    globalThis.HTMLElement = class HTMLElement {};
-  #|    // The stub needs attachShadow too, or the shadow DOM path is untestable headlessly.
+  #|    // The shadow root needs the same listener surface as an element, or actions bound to
+  #|    // it would be untestable headlessly.
+  #|    const stubAdd = function (type, fn) {
+  #|      if (!this.__listeners) {
+  #|        this.__listeners = Object.create(null);
+  #|      }
+  #|      (this.__listeners[type] || (this.__listeners[type] = [])).push(fn);
+  #|    };
+  #|    const stubDispatch = function (ev) {
+  #|      const list = (this.__listeners && this.__listeners[ev.type]) || [];
+  #|      for (const fn of list) {
+  #|        fn(ev);
+  #|      }
+  #|      return !ev.defaultPrevented;
+  #|    };
   #|    globalThis.HTMLElement.prototype.attachShadow = function (opts) {
   #|      this.shadowRoot = {
   #|        innerHTML: "",
   #|        host: this,
   #|        mode: (opts && opts.mode) || "open",
+  #|        addEventListener: stubAdd,
+  #|        dispatchEvent: stubDispatch,
   #|      };
   #|      return this.shadowRoot;
   #|    };
@@ -42,18 +58,35 @@ pub extern "js" fn install_dom_stub() -> Unit =
   #|        }
   #|      }
   #|    };
-  #|    globalThis.HTMLElement.prototype.addEventListener = function (type, fn) {
-  #|      if (!this.__listeners) {
-  #|        this.__listeners = Object.create(null);
+  #|    globalThis.HTMLElement.prototype.addEventListener = stubAdd;
+  #|    globalThis.HTMLElement.prototype.dispatchEvent = stubDispatch;
+  #|    // Real attribute methods so the stub follows the same path as a browser.
+  #|    globalThis.HTMLElement.prototype.setAttribute = function (name, value) {
+  #|      if (!this.__moonAttrs) {
+  #|        this.__moonAttrs = Object.create(null);
   #|      }
-  #|      (this.__listeners[type] || (this.__listeners[type] = [])).push(fn);
+  #|      const old = this.__moonAttrs[name];
+  #|      this.__moonAttrs[name] = String(value);
+  #|      if (typeof this.attributeChangedCallback === "function") {
+  #|        this.attributeChangedCallback(
+  #|          name,
+  #|          old === undefined ? null : old,
+  #|          String(value),
+  #|        );
+  #|      }
   #|    };
-  #|    globalThis.HTMLElement.prototype.dispatchEvent = function (ev) {
-  #|      const list = (this.__listeners && this.__listeners[ev.type]) || [];
-  #|      for (const fn of list) {
-  #|        fn(ev);
+  #|    globalThis.HTMLElement.prototype.removeAttribute = function (name) {
+  #|      const old = this.__moonAttrs ? this.__moonAttrs[name] : undefined;
+  #|      if (this.__moonAttrs) {
+  #|        delete this.__moonAttrs[name];
   #|      }
-  #|      return !ev.defaultPrevented;
+  #|      if (typeof this.attributeChangedCallback === "function") {
+  #|        this.attributeChangedCallback(name, old === undefined ? null : old, null);
+  #|      }
+  #|    };
+  #|    globalThis.HTMLElement.prototype.getAttribute = function (name) {
+  #|      const value = this.__moonAttrs ? this.__moonAttrs[name] : undefined;
+  #|      return value === undefined ? null : value;
   #|    };
   #|  }
   #|}

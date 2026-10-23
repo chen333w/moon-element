@@ -2,6 +2,12 @@
 /// Browser adapter for `core`: DOM wiring and instance state.
 
 ///|
+priv struct ActionBinding {
+  spec : @core.ActionSpec
+  run : (Int32, String) -> Unit
+}
+
+///|
 priv struct ComponentDef {
   tag : String
   specs : Array[@core.AttrSpec]
@@ -9,6 +15,10 @@ priv struct ComponentDef {
   events : Array[@core.EventSpec]
   styles : String
   mode : @core.RenderMode
+  actions : Array[ActionBinding]
+  // Event types with a listener, joined by "\n" so the value crosses the FFI as a string
+  // (event names cannot contain whitespace, so the separator is unambiguous).
+  action_events : String
 }
 
 ///|
@@ -21,6 +31,8 @@ priv struct Instance {
   tag : String
   styles : String
   mode : @core.RenderMode
+  actions : Array[ActionBinding]
+  action_log : Array[String]
 }
 
 ///|
@@ -64,6 +76,8 @@ fn ensure_instance(id : Int32, def : ComponentDef) -> Instance {
         tag: def.tag,
         styles: def.styles,
         mode: def.mode,
+        actions: def.actions,
+        action_log: [],
       }
       instance_put(id, inst)
       inst
@@ -108,8 +122,33 @@ pub fn define_component(
   on_change~ : (Int32, String) -> Unit = fn(_id, _name) { () },
   styles~ : String = "",
   mode~ : @core.RenderMode = @core.ShadowDom,
+  on_action~ : Array[(@core.ActionSpec, (Int32, String) -> Unit)] = [],
 ) -> Unit {
-  let def : ComponentDef = { tag, specs, render_fn, events, styles, mode, }
+  // Invalid or duplicate pairs are dropped instead of failing the whole definition.
+  let action_registry = @core.ActionRegistry::new()
+  let actions : Array[ActionBinding] = []
+  for binding in on_action {
+    if action_registry.add(binding.0) {
+      actions.push({ spec: binding.0, run: binding.1, })
+    }
+  }
+  let mut action_events = ""
+  for event_type in action_registry.event_types() {
+    if action_events != "" {
+      action_events = action_events + "\n"
+    }
+    action_events = action_events + event_type
+  }
+  let def : ComponentDef = {
+    tag,
+    specs,
+    render_fn,
+    events,
+    styles,
+    mode,
+    actions,
+    action_events,
+  }
   let use_shadow = match mode {
     @core.ShadowDom => true
     @core.LightDom => false
@@ -156,9 +195,36 @@ pub fn define_component(
     // Notify after state and DOM are updated.
     on_change(id, name)
   }
+  let on_action : (Int32, String, String) -> Unit = fn(id, event_type, action) {
+    let inst = ensure_instance(id, def)
+    for binding in inst.actions {
+      if binding.spec.event() == event_type && binding.spec.action() == action {
+        inst.action_log.push("\{event_type}:\{action}")
+        instance_put(id, inst)
+        let run = binding.run
+        run(id, action)
+      }
+    }
+  }
   js_define(
-    tag, observed, on_connected, on_disconnected, on_attribute, use_shadow,
+    tag,
+    observed,
+    on_connected,
+    on_disconnected,
+    on_attribute,
+    use_shadow,
+    def.action_events,
+    on_action,
   )
+}
+
+///|
+/// Actions handled so far, in order, as "event:action" (diagnostics and tests).
+pub fn instance_action_log(id : Int32) -> Array[String] {
+  match instance_get(id) {
+    Some(inst) => inst.action_log
+    None => []
+  }
 }
 
 ///|
@@ -204,8 +270,23 @@ extern "js" fn js_define(
   on_disconnected : (Int32) -> Unit,
   on_attribute : (Int32, String, Bool, String, Bool, String) -> Unit,
   use_shadow : Bool,
+  action_events : String,
+  on_action : (Int32, String, String) -> Unit,
 ) -> Unit =
-  #|(tag, observed, onConnected, onDisconnected, onAttribute, useShadow) => {
+  #|(tag, observed, onConnected, onDisconnected, onAttribute, useShadow, actionEvents, onAction) => {
+  #|  const actionTypes = actionEvents ? String(actionEvents).split("\n").filter(Boolean) : [];
+  #|  // Walk up from the event target to the listener's container looking for data-act.
+  #|  const findAction = (container, ev) => {
+  #|    let node = ev.target;
+  #|    while (node && node !== container) {
+  #|      if (typeof node.getAttribute === "function") {
+  #|        const act = node.getAttribute("data-act");
+  #|        if (act) return act;
+  #|      }
+  #|      node = node.parentNode;
+  #|    }
+  #|    return null;
+  #|  };
   #|  const reg =
   #|    globalThis.__moon_element_instances ||
   #|    (globalThis.__moon_element_instances = {
@@ -226,6 +307,20 @@ extern "js" fn js_define(
   #|    connectedCallback() {
   #|      if (useShadow && !this.shadowRoot) {
   #|        this.attachShadow({ mode: "open" });
+  #|      }
+  #|      // One listener per event type on the shadow root (or the host in light mode): both
+  #|      // survive re-rendering, unlike listeners on the replaced content.
+  #|      if (!this.__moonActionsBound && actionTypes.length > 0) {
+  #|        this.__moonActionsBound = true;
+  #|        const container = useShadow ? this.shadowRoot : this;
+  #|        for (const type of actionTypes) {
+  #|          container.addEventListener(type, (ev) => {
+  #|            const action = findAction(container, ev);
+  #|            if (action) {
+  #|              onAction(this.__moonId, type, action);
+  #|            }
+  #|          });
+  #|        }
   #|      }
   #|      onConnected(this.__moonId);
   #|    }
@@ -367,6 +462,64 @@ pub extern "js" fn probe_remove_attribute(id : Int32, name : String) -> Unit =
   #|    old === undefined ? null : old,
   #|    null,
   #|  );
+  #|}
+
+///|
+
+///|
+/// Sets an attribute on the host element, which re-renders the component through the normal
+/// attribute pipeline. Returns silently for an unknown id.
+pub extern "js" fn set_attribute(
+  id : Int32,
+  name : String,
+  value : String,
+) -> Unit =
+  #|(id, name, value) => {
+  #|  const reg = globalThis.__moon_element_instances;
+  #|  const el = reg && reg.byId[id];
+  #|  if (!el) return;
+  #|  if (typeof el.setAttribute === "function") {
+  #|    el.setAttribute(name, String(value));
+  #|    return;
+  #|  }
+  #|  const old = el.__moonAttrs ? el.__moonAttrs[name] : undefined;
+  #|  el.attributeChangedCallback(name, old === undefined ? null : old, String(value));
+  #|}
+
+///|
+/// Removes an attribute from the host element; the value falls back to the spec default.
+pub extern "js" fn remove_attribute(id : Int32, name : String) -> Unit =
+  #|(id, name) => {
+  #|  const reg = globalThis.__moon_element_instances;
+  #|  const el = reg && reg.byId[id];
+  #|  if (!el) return;
+  #|  if (typeof el.removeAttribute === "function") {
+  #|    el.removeAttribute(name);
+  #|    return;
+  #|  }
+  #|  const old = el.__moonAttrs ? el.__moonAttrs[name] : undefined;
+  #|  el.attributeChangedCallback(name, old === undefined ? null : old, null);
+  #|}
+
+///|
+/// Simulates an event from an element carrying `data-act="action"`, with one non-actionable
+/// element in between so the walk up the tree is exercised.
+pub extern "js" fn probe_fire_action(
+  id : Int32,
+  event : String,
+  action : String,
+) -> Unit =
+  #|(id, type, action) => {
+  #|  const reg = globalThis.__moon_element_instances;
+  #|  const el = reg && reg.byId[id];
+  #|  if (!el) return;
+  #|  const container = el.shadowRoot ? el.shadowRoot : el;
+  #|  const middle = { getAttribute: () => null, parentNode: container };
+  #|  const target = {
+  #|    getAttribute: (name) => (name === "data-act" && action ? action : null),
+  #|    parentNode: middle,
+  #|  };
+  #|  container.dispatchEvent({ type, target, defaultPrevented: false });
   #|}
 
 ///|

@@ -12,6 +12,8 @@ pub fn component_skeleton(String, mode? : RenderMode) -> String?
 
 pub fn escape_text(String) -> String
 
+pub fn is_valid_action(String) -> Bool
+
 pub fn is_valid_event_name(String) -> Bool
 
 pub fn kebab_to_camel(String) -> String
@@ -33,6 +35,23 @@ pub fn validate_tag_name(String) -> Bool
 // Errors
 
 // Types and methods
+pub struct ActionRegistry {
+  specs : Array[ActionSpec]
+}
+pub fn ActionRegistry::add(Self, ActionSpec) -> Bool
+pub fn ActionRegistry::event_types(Self) -> Array[String]
+pub fn ActionRegistry::find(Self, String, String) -> ActionSpec?
+pub fn ActionRegistry::length(Self) -> Int32
+pub fn ActionRegistry::new() -> Self
+
+pub(all) struct ActionSpec {
+  event : String
+  action : String
+}
+pub fn ActionSpec::action(Self) -> String
+pub fn ActionSpec::event(Self) -> String
+pub fn ActionSpec::new(String, String) -> Self
+
 pub(all) enum AttrKind {
   AttrString
   AttrInt
