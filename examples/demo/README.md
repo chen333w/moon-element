@@ -23,21 +23,23 @@ node examples/demo/verify.mjs
 
 It imports the build artifact (the same file the page loads) and asserts component
 registration, attribute reflection, fallback for invalid values, HTML escaping, event
-dispatch, and light DOM rendering on a minimal DOM stub: 19 checks in total.
+dispatch, in-component button actions, and light DOM rendering on a minimal DOM stub:
+21 checks in total.
 
 ## What the page shows
 
 | Section | Capability |
 | --- | --- |
-| 1 · counter | attribute-driven re-rendering (`el.setAttribute("count", n)`), fallback to the default for invalid values, notification through a `crossing` event (`bubbles + composed`) |
+| 1 · counter | in-component events (`on_action` + `data-act`: the +/- buttons update the component's own `count`, clamped to `0..max`), attribute-driven re-rendering from the page (`el.setAttribute("count", n)`), fallback to the default for invalid values, notification through a `crossing` event (`bubbles + composed`) |
 | 2 · badge | shadow DOM style isolation: the page sets strong styles on `.pill` / `span`, the component is unaffected |
 | 3 · escaping | set `label` to `<b>bold</b>`, it renders as literal text |
 | 4 · card | composed structure with live updates (the input drives the `body` attribute) |
 | 5 · light DOM panel | `mode=LightDom` + `styles`: the adapter prefixes selectors with `scope_css` to `x-panel ...` |
 
 Data flows one way: page sets attribute → component re-renders → component emits event →
-page receives it. Components attach no DOM listeners (re-rendering replaces the whole
-`innerHTML` and would drop them), so the interactive controls live on the page side.
+page receives it. A component can also handle clicks on its own rendered content: the
+adapter binds one listener per event type to the shadow root (or to the host in light
+mode), so the binding survives re-rendering.
 
 ## The two isolation modes
 

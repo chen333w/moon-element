@@ -38,7 +38,7 @@
   <div id="boot-error" class="err" hidden></div>
 
   <section>
-    <h2>1 · Attribute-driven rendering + events out to the page</h2>
+    <h2>1 · In-component events + attribute-driven rendering</h2>
     <div class="row">
       <x-counter id="counter" count="3" max="10" label="Tasks processed"></x-counter>
       <div class="row">
@@ -48,9 +48,13 @@
       </div>
     </div>
     <p class="note">
-      The buttons only set attributes: <code>el.setAttribute("count", n)</code>. The
-      component re-renders and notifies the page through an event declared as
-      <code>crossing</code> (bubbles + composed). An invalid value is not an error; it
+      The <code>+</code> / <code>-</code> buttons are rendered inside the component and
+      handled there through <code>on_action</code> + <code>data-act</code>: the adapter
+      binds a <code>click</code> listener to the shadow root, which survives re-rendering,
+      and the value stays within <code>0..max</code>. The page-side buttons next to it
+      drive the same state from outside with <code>el.setAttribute("count", n)</code>.
+      Either path re-renders the component and notifies the page through an event declared
+      as <code>crossing</code> (bubbles + composed). An invalid value is not an error; it
       falls back to the default.
     </p>
     <div id="log"></div>

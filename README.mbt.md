@@ -68,6 +68,8 @@ node examples/demo/verify.mjs
 | `Props::get_string/get_int/get_double/get_bool/keys` | typed access inside the render function |
 | `View::element/text/raw/fragment/nothing` | the view tree; text and attribute values are escaped, `VRaw` is not |
 | `EventSpec::crossing(name)` / `contained(name)` | `crossing` = bubbles + composed, `contained` stays inside |
+| `on_action=[(ActionSpec::new("click", "inc"), handler)]` | handles DOM events on elements marked `data-act="inc"` inside the component, including when a re-render has replaced them |
+| `set_attribute` / `remove_attribute` | writes back to the component's own attributes, which re-renders it |
 | `dispatch(id, name, detail, cancelable)` | sends an event from a component |
 | `scope_css(css, scope)` | rewrites a `:host` stylesheet into prefixed form |
 | `mode` | `ShadowDom` (default) or `LightDom`; in light mode `styles` is scoped to the tag name |
@@ -100,8 +102,8 @@ them to the DOM. The adapter tests use a small in-repo DOM stub, so no npm depen
 
 ## Limitations
 
-- Rendering replaces `shadowRoot.innerHTML` wholesale, with no diff. Components should not attach DOM
-  listeners internally (the next render drops them); put interaction in the page.
+- Rendering replaces the content as a whole, with no diff. Keep state in attributes and handle DOM
+  events with `on_action`: a listener attached to a rendered element is dropped by the next render.
 - Tag name validation accepts an ASCII subset (the spec allows some non-ASCII).
 - `::slotted()` and `:host-context()` are shadow DOM semantics and are not rewritten.
 - No threads or async (MoonBit has no OS threads, and async is complete on native only).

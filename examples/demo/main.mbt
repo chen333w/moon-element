@@ -1,7 +1,7 @@
 ///|
 /// The demo's four components: attribute reflection with fallback, shadow DOM isolation,
-/// HTML escaping, and events dispatched to the page. Components attach no DOM listeners
-/// (re-rendering replaces innerHTML), so the page owns the buttons.
+/// HTML escaping, and events dispatched to the page. x-counter also handles its own +/-
+/// buttons through `on_action` + `data-act`, so a click survives re-rendering.
 
 ///|
 const COUNTER_CSS : String =
@@ -12,6 +12,9 @@ const COUNTER_CSS : String =
   #|  .num { font-size: 30px; font-weight: 650; color: #1f6feb; margin: 2px 0 8px; }
   #|  .bar { height: 6px; border-radius: 3px; background: #eaeef3; overflow: hidden; }
   #|  .bar > i { display: block; height: 100%; background: #1f6feb; }
+  #|  .acts { display: flex; gap: 6px; margin-top: 10px; }
+  #|  .acts button { font: inherit; padding: 4px 10px; border: 1px solid #cfd8e3;
+  #|                 border-radius: 8px; background: #fff; cursor: pointer; }
 
 ///|
 fn counter_view(props : @core.Props) -> @core.View {
@@ -39,6 +42,14 @@ fn counter_view(props : @core.Props) -> @core.View {
       ]),
       @core.View::element("div", [("class", "bar")], [
         @core.View::element("i", [("style", "width:\{pct}%")], []),
+      ]),
+      @core.View::element("div", [("class", "acts")], [
+        @core.View::element("button", [("data-act", "dec")], [
+          @core.View::text("-"),
+        ]),
+        @core.View::element("button", [("data-act", "inc")], [
+          @core.View::text("+"),
+        ]),
       ]),
     ]),
   ])
@@ -128,6 +139,16 @@ fn panel_view(props : @core.Props) -> @core.View {
 }
 
 ///|
+/// 内部按钮用：读当前属性、夹在 0..max，再写回属性管线触发重渲染。
+fn step_count(id : Int32, delta : Int32) -> Unit {
+  let count = @dom.instance_prop_int(id, "count").unwrap_or(0)
+  let max = @dom.instance_prop_int(id, "max").unwrap_or(10)
+  let next = count + delta
+  let clamped = if next < 0 { 0 } else if next > max { max } else { next }
+  @dom.set_attribute(id, "count", clamped.to_string())
+}
+
+///|
 /// Registers the four demo components.
 pub fn register_demo() -> Unit {
   @dom.define_component(
@@ -143,6 +164,16 @@ pub fn register_demo() -> Unit {
     on_change=fn(id, _name) {
       let _ = @dom.dispatch(id, "count-changed", "", false)
     },
+    on_action=[
+      (
+        @core.ActionSpec::new("click", "inc"),
+        fn(id, _action) { step_count(id, 1) },
+      ),
+      (
+        @core.ActionSpec::new("click", "dec"),
+        fn(id, _action) { step_count(id, -1) },
+      ),
+    ],
   )
   @dom.define_component(
     "x-badge",

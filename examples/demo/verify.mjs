@@ -13,23 +13,28 @@ import { fileURLToPath, pathToFileURL } from "node:url";
 function installDomStub() {
   if (globalThis.customElements) return;
   globalThis.HTMLElement = class HTMLElement {};
+  const stubAdd = function (type, fn) {
+    if (!this.__listeners) this.__listeners = Object.create(null);
+    (this.__listeners[type] || (this.__listeners[type] = [])).push(fn);
+  };
+  const stubDispatch = function (ev) {
+    const list = (this.__listeners && this.__listeners[ev.type]) || [];
+    for (const fn of list) fn(ev);
+    return !ev.defaultPrevented;
+  };
+  // The shadow root needs the same listener surface as an element: actions are bound there.
   globalThis.HTMLElement.prototype.attachShadow = function (opts) {
     this.shadowRoot = {
       innerHTML: "",
       host: this,
       mode: (opts && opts.mode) || "open",
+      addEventListener: stubAdd,
+      dispatchEvent: stubDispatch,
     };
     return this.shadowRoot;
   };
-  globalThis.HTMLElement.prototype.addEventListener = function (type, fn) {
-    if (!this.__listeners) this.__listeners = Object.create(null);
-    (this.__listeners[type] || (this.__listeners[type] = [])).push(fn);
-  };
-  globalThis.HTMLElement.prototype.dispatchEvent = function (ev) {
-    const list = (this.__listeners && this.__listeners[ev.type]) || [];
-    for (const fn of list) fn(ev);
-    return !ev.defaultPrevented;
-  };
+  globalThis.HTMLElement.prototype.addEventListener = stubAdd;
+  globalThis.HTMLElement.prototype.dispatchEvent = stubDispatch;
   globalThis.CustomEvent = class CustomEvent {
     constructor(type, init) {
       this.type = type;
@@ -42,6 +47,26 @@ function installDomStub() {
     preventDefault() {
       if (this.cancelable) this.defaultPrevented = true;
     }
+  };
+  // Real attribute methods, so set_attribute goes through attributeChangedCallback.
+  globalThis.HTMLElement.prototype.setAttribute = function (name, value) {
+    if (!this.__moonAttrs) this.__moonAttrs = Object.create(null);
+    const old = this.__moonAttrs[name];
+    this.__moonAttrs[name] = String(value);
+    if (typeof this.attributeChangedCallback === "function") {
+      this.attributeChangedCallback(name, old === undefined ? null : old, String(value));
+    }
+  };
+  globalThis.HTMLElement.prototype.removeAttribute = function (name) {
+    const old = this.__moonAttrs ? this.__moonAttrs[name] : undefined;
+    if (this.__moonAttrs) delete this.__moonAttrs[name];
+    if (typeof this.attributeChangedCallback === "function") {
+      this.attributeChangedCallback(name, old === undefined ? null : old, null);
+    }
+  };
+  globalThis.HTMLElement.prototype.getAttribute = function (name) {
+    const value = this.__moonAttrs ? this.__moonAttrs[name] : undefined;
+    return value === undefined ? null : value;
   };
   const registry = Object.create(null);
   globalThis.customElements = {
@@ -66,6 +91,21 @@ function check(name, cond, detail) {
     failed += 1;
     console.log(`  FAIL ${name}${detail === undefined ? "" : "  → " + detail}`);
   }
+}
+
+// 模拟组件内部点击：从 shadow root 派发带 data-act 的 target 链，与适配层的查找路径一致。
+function fireAction(el, action) {
+  const container = el.shadowRoot || el;
+  const target = {
+    getAttribute: (name) => (name === "data-act" ? action : null),
+    parentNode: container,
+  };
+  container.dispatchEvent({ type: "click", target, defaultPrevented: false });
+}
+
+// 渲染出的计数，用于按数值比较而不是匹配整段 HTML。
+function shownCount(el) {
+  return Number(el.shadowRoot.innerHTML.match(/>(-?\d+)<\/div>/)?.[1]);
 }
 
 const bundlePath = new URL(
@@ -128,6 +168,27 @@ if (typeof registry["x-counter"] === "function") {
     "an invalid attribute value falls back to the default instead of erroring",
     c.shadowRoot.innerHTML.includes(">0</div>"),
     c.shadowRoot.innerHTML.match(/>-?\d+<\/div>/)?.[0],
+  );
+
+  // 组件自己的 + / - 按钮：由 on_action 处理，值夹在 0..max。
+  c.setAttribute("count", "3");
+  fireAction(c, "inc");
+  check(
+    "an in-component + button raises count to 4",
+    c.shadowRoot.innerHTML.includes('data-act="inc"') && shownCount(c) === 4,
+    `count=${shownCount(c)}`,
+  );
+  c.setAttribute("count", "4");
+  fireAction(c, "dec");
+  const afterDec = shownCount(c);
+  c.setAttribute("count", "0");
+  fireAction(c, "dec");
+  check(
+    "an in-component - button lowers count and stops at 0",
+    c.shadowRoot.innerHTML.includes('data-act="dec"') &&
+      afterDec === 3 &&
+      shownCount(c) === 0,
+    `after dec: ${afterDec}, again at 0: ${shownCount(c)}`,
   );
 
   // x-badge: HTML escaping

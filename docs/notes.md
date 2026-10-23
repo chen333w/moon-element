@@ -34,8 +34,18 @@ script with a self-executing initialization at the end.
 The browser loads it anyway, because `<script type="module" src="...">` accepts a script with no
 exports. `examples/demo/moon.pkg` therefore leaves the option out.
 
-`examples/demo/verify.mjs` imports that same file under node and checks 19 behaviors on a small DOM
+`examples/demo/verify.mjs` imports that same file under node and checks 21 behaviors on a small DOM
 stub. CI runs it after `moon build --target js --release`.
+
+## In-component events
+
+Content is rebuilt on every render, so a listener attached to a rendered element would be dropped
+by the next render. `on_action` binds an event type to elements marked with `data-act`, and the
+adapter attaches one listener per event type to the shadow root (or to the host element in light
+mode). Both survive rendering, and the handler is found by walking up from the event target.
+
+`set_attribute` writes through the normal attribute pipeline, so a handler can update the
+component's own state and let the re-render follow.
 
 ## Toolchain
 
