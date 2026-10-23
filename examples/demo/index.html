@@ -33,7 +33,7 @@
 </head>
 <body>
   <h1>moon-element</h1>
-  <div class="sub">Standard Web Components written in MoonBit — registered as custom elements, embeddable in any page or framework.</div>
+  <div class="sub">Standard Web Components written in MoonBit. Registered as custom elements, so they embed in any page or framework.</div>
 
   <div id="boot-error" class="err" hidden></div>
 
@@ -134,8 +134,8 @@
       box.hidden = false;
       box.textContent =
         "Failed to load the components: " + e.message +
-        " — run `moon build --target js --release` at the repo root first, then open this" +
-        " page over HTTP (ES modules cannot load from file://; try `python3 -m http.server 8000`).";
+        " Run `moon build --target js --release` at the repo root first, then open this page" +
+        " over HTTP (ES modules cannot load from file://; try `python3 -m http.server 8000`).";
       throw e;
     }
 
@@ -153,7 +153,7 @@
     };
     document.getElementById("set-bad").onclick = () => {
       counter.setAttribute("count", "abc");
-      log("count set to abc — the component falls back to the default 0");
+      log("count set to abc: the component falls back to the default 0");
     };
 
     const badge = document.getElementById("badge");
