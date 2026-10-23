@@ -34,7 +34,7 @@ script with a self-executing initialization at the end.
 The browser loads it anyway, because `<script type="module" src="...">` accepts a script with no
 exports. `examples/demo/moon.pkg` therefore leaves the option out.
 
-`examples/demo/verify.mjs` imports that same file under node and checks 16 behaviors on a small DOM
+`examples/demo/verify.mjs` imports that same file under node and checks 19 behaviors on a small DOM
 stub. CI runs it after `moon build --target js --release`.
 
 ## Toolchain

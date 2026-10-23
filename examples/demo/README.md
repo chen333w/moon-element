@@ -23,7 +23,7 @@ node examples/demo/verify.mjs
 
 It imports the build artifact (the same file the page loads) and asserts component
 registration, attribute reflection, fallback for invalid values, HTML escaping, event
-dispatch, and light DOM rendering on a minimal DOM stub: 16 checks in total.
+dispatch, and light DOM rendering on a minimal DOM stub: 19 checks in total.
 
 ## What the page shows
 

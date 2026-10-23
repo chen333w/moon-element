@@ -6,7 +6,8 @@
 //
 // Exit code 0 means every check passed; 1 means an assertion failed.
 
-import { pathToFileURL } from "node:url";
+import { existsSync, readFileSync } from "node:fs";
+import { fileURLToPath, pathToFileURL } from "node:url";
 
 // Minimal DOM stub, equivalent to install_dom_stub in dom/element_ffi.mbt.
 function installDomStub() {
@@ -174,6 +175,55 @@ if (typeof registry["x-panel"] === "function") {
   panel.attributeChangedCallback("body", null, "updated");
   check("an attribute change re-renders in light mode too", panel.innerHTML.includes("updated"));
 }
+
+// The page itself is the acceptance artifact, but it cannot be rendered here, so check the
+// page/bundle contract statically. These catch breakage that only shows up in a browser.
+const htmlPath = fileURLToPath(new URL("./index.html", import.meta.url));
+const html = readFileSync(htmlPath, "utf8");
+// ignore the inline script when scanning for elements
+const markup = html.replace(/<script[\s\S]*?<\/script>/g, "");
+const GLOBAL_ATTRS = new Set([
+  "id",
+  "class",
+  "style",
+  "slot",
+  "part",
+  "role",
+  "tabindex",
+  "hidden",
+  "dir",
+  "lang",
+  "draggable",
+]);
+
+const used = [...markup.matchAll(/<(x-[a-z0-9-]+)((?:\s+[^<>]*?)?)\s*>/g)];
+const problems = [];
+for (const [, tag, attrs] of used) {
+  const ctor = registry[tag];
+  if (typeof ctor !== "function") {
+    problems.push(`<${tag}> is not registered`);
+    continue;
+  }
+  const observed = new Set(ctor.observedAttributes || []);
+  for (const m of attrs.matchAll(/([a-zA-Z][\w-]*)\s*=/g)) {
+    const name = m[1];
+    if (GLOBAL_ATTRS.has(name) || name.startsWith("data-") || name.startsWith("aria-")) continue;
+    if (!observed.has(name)) problems.push(`<${tag}> sets "${name}", which is not observed`);
+  }
+}
+check("the demo page uses custom elements", used.length > 0, `${used.length} tags`);
+check(
+  "every element and attribute used by the page is registered and observed",
+  problems.length === 0,
+  problems.join("; "),
+);
+
+const spec = html.match(/await import\("([^"]+)"\)/);
+check(
+  "the bundle the page imports exists after a build",
+  !!spec && existsSync(fileURLToPath(new URL(spec[1], pathToFileURL(htmlPath)))),
+  spec ? spec[1] : "no dynamic import found",
+);
 
 console.log(`\npassed ${passed}, failed ${failed}`);
 process.exit(failed === 0 ? 0 : 1);
