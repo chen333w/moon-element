@@ -1,0 +1,124 @@
+// Generated using `moon info`, DON'T EDIT IT
+package "chen333w/moon-element/style"
+
+// Values
+
+// Errors
+
+// Types and methods
+pub(all) enum Align {
+  Stretch
+  Start
+  Center
+  End
+} derive(Eq)
+pub fn Align::equal(Self, Self) -> Bool
+pub fn Align::not_equal(Self, Self) -> Bool
+
+pub(all) struct ComputedStyle {
+  display : Display
+  width : Length
+  height : Length
+  min_width : Length
+  max_width : Length
+  padding : Edges
+  border : Edges
+  margin : Edges
+  gap : Double
+  flex_direction : FlexDirection
+  flex_wrap : FlexWrap
+  justify_content : Justify
+  align_items : Align
+  flex_grow : Double
+  flex_shrink : Double
+  flex_basis : Length
+  font_size : Double
+  color : Rgba
+  background_color : Rgba
+  border_color : Rgba
+  border_radius : Double
+} derive(Eq)
+pub fn ComputedStyle::equal(Self, Self) -> Bool
+pub fn ComputedStyle::initial() -> Self
+pub fn ComputedStyle::not_equal(Self, Self) -> Bool
+
+pub(all) enum Display {
+  Block
+  Flex
+  None
+} derive(Eq)
+pub fn Display::equal(Self, Self) -> Bool
+pub fn Display::not_equal(Self, Self) -> Bool
+
+pub(all) struct Edges {
+  top : Double
+  right : Double
+  bottom : Double
+  left : Double
+} derive(Eq)
+pub fn Edges::all(Double) -> Self
+pub fn Edges::equal(Self, Self) -> Bool
+pub fn Edges::horizontal(Self) -> Double
+pub fn Edges::none() -> Self
+pub fn Edges::not_equal(Self, Self) -> Bool
+pub fn Edges::vertical(Self) -> Double
+
+pub(all) struct ElementInfo {
+  tag : String
+  id : String
+  classes : Array[String]
+  inline : Array[(String, String)]
+  parent : Int32
+} derive(Eq)
+pub fn ElementInfo::equal(Self, Self) -> Bool
+pub fn ElementInfo::not_equal(Self, Self) -> Bool
+
+pub(all) enum FlexDirection {
+  Row
+  Column
+} derive(Eq)
+pub fn FlexDirection::equal(Self, Self) -> Bool
+pub fn FlexDirection::not_equal(Self, Self) -> Bool
+
+pub(all) enum FlexWrap {
+  NoWrap
+  Wrap
+} derive(Eq)
+pub fn FlexWrap::equal(Self, Self) -> Bool
+pub fn FlexWrap::not_equal(Self, Self) -> Bool
+
+pub(all) enum Justify {
+  Start
+  Center
+  End
+  SpaceBetween
+  SpaceAround
+  SpaceEvenly
+} derive(Eq)
+pub fn Justify::equal(Self, Self) -> Bool
+pub fn Justify::not_equal(Self, Self) -> Bool
+
+pub(all) enum Length {
+  Px(Double)
+  Percent(Double)
+  Em(Double)
+  Rem(Double)
+  Auto
+} derive(Eq)
+pub fn Length::equal(Self, Self) -> Bool
+pub fn Length::not_equal(Self, Self) -> Bool
+
+pub(all) struct Rgba {
+  r : Int32
+  g : Int32
+  b : Int32
+  a : Double
+} derive(Eq)
+pub fn Rgba::black() -> Self
+pub fn Rgba::equal(Self, Self) -> Bool
+pub fn Rgba::not_equal(Self, Self) -> Bool
+pub fn Rgba::transparent() -> Self
+
+// Type aliases
+
+// Traits
