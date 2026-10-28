@@ -1,0 +1,10 @@
+import {
+  "chen333w/moon-element/core",
+}
+
+import {
+  "chen333w/moon-element/layout",
+  "chen333w/moon-element/pipeline",
+  "chen333w/moon-element/style",
+  "chen333w/moon-element/svg",
+} for "test"

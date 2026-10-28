@@ -15,6 +15,17 @@ pub(all) enum Align {
 pub fn Align::equal(Self, Self) -> Bool
 pub fn Align::not_equal(Self, Self) -> Bool
 
+pub enum Combinator {
+  Descendant
+  Child
+}
+
+pub struct Compound {
+  tag : String
+  id : String
+  classes : Array[String]
+}
+
 pub(all) struct ComputedStyle {
   display : Display
   width : Length
@@ -41,6 +52,12 @@ pub(all) struct ComputedStyle {
 pub fn ComputedStyle::equal(Self, Self) -> Bool
 pub fn ComputedStyle::initial() -> Self
 pub fn ComputedStyle::not_equal(Self, Self) -> Bool
+
+pub struct Decl {
+  prop : Prop
+  value : Value
+  important : Bool
+}
 
 pub(all) enum Display {
   Block
@@ -108,6 +125,39 @@ pub(all) enum Length {
 pub fn Length::equal(Self, Self) -> Bool
 pub fn Length::not_equal(Self, Self) -> Bool
 
+pub enum Prop {
+  PDisplay
+  PWidth
+  PHeight
+  PMinWidth
+  PMaxWidth
+  PPaddingTop
+  PPaddingRight
+  PPaddingBottom
+  PPaddingLeft
+  PBorderTop
+  PBorderRight
+  PBorderBottom
+  PBorderLeft
+  PMarginTop
+  PMarginRight
+  PMarginBottom
+  PMarginLeft
+  PGap
+  PFlexDirection
+  PFlexWrap
+  PJustifyContent
+  PAlignItems
+  PFlexGrow
+  PFlexShrink
+  PFlexBasis
+  PFontSize
+  PColor
+  PBackgroundColor
+  PBorderColor
+  PBorderRadius
+}
+
 pub(all) struct Rgba {
   r : Int32
   g : Int32
@@ -118,6 +168,40 @@ pub fn Rgba::black() -> Self
 pub fn Rgba::equal(Self, Self) -> Bool
 pub fn Rgba::not_equal(Self, Self) -> Bool
 pub fn Rgba::transparent() -> Self
+
+pub struct Rule {
+  selectors : Array[Selector]
+  decls : Array[Decl]
+  order : Int32
+}
+
+pub struct Selector {
+  compounds : Array[Compound]
+  combinators : Array[Combinator]
+  spec_id : Int32
+  spec_class : Int32
+  spec_tag : Int32
+}
+
+pub struct Stylesheet {
+  rules : Array[Rule]
+  warns : Array[String]
+}
+pub fn Stylesheet::compute(Self, Array[ElementInfo]) -> Array[ComputedStyle]
+pub fn Stylesheet::parse(String) -> Self
+pub fn Stylesheet::rule_count(Self) -> Int32
+pub fn Stylesheet::warnings(Self) -> Array[String]
+
+pub enum Value {
+  VLength(Length)
+  VColor(Rgba, Bool)
+  VDisplay(Display)
+  VDirection(FlexDirection)
+  VWrap(FlexWrap)
+  VJustify(Justify)
+  VAlign(Align)
+  VNumber(Double)
+}
 
 // Type aliases
 

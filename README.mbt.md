@@ -6,7 +6,11 @@
 
 Standard Web Components in [MoonBit](https://www.moonbitlang.com/). Components register with
 `customElements.define`, so they work in any page or framework without a MoonBit-side runtime.
-This is not a frontend framework: it does not own the page, it just provides custom elements.
+
+The same view tree can also be laid out **without a browser**: `style` computes the cascade,
+`layout` computes geometry and `svg` serializes the result. That is useful for server-side
+pre-layout, generating images in CI, and geometry regression tests. This is not a frontend
+framework: it does not own the page, and it does not do signals or diffing.
 
 ## Quick start
 
@@ -63,6 +67,23 @@ Headless check of the built artifact (the same file the browser loads):
 node examples/demo/verify.mjs
 ```
 
+## Layout without a browser
+
+```moonbit nocheck
+let view = @core.View::element("div", [("class", "card")], [
+  @core.View::element("h2", [], [@core.View::text("Total")]),
+  @core.View::element("span", [("class", "num")], [@core.View::text("42")]),
+])
+let css = #|.card { display: flex; padding: 12px; gap: 8px; width: 100%; }
+let (style_root, box) = @pipeline.run(view, css, 640.0, @pipeline.measure_monospace)
+println(@svg.to_json(style_root, box))   // deterministic geometry, one line per box
+println(@svg.to_svg(style_root, box))    // a standalone SVG document
+```
+
+Text width comes from an injected measurer, so the engine does not depend on a font stack:
+`measure_monospace` is deterministic and good enough for tests, and a browser build can pass
+`CanvasRenderingContext2D` metrics instead.
+
 ## API
 
 | | |
@@ -77,6 +98,10 @@ node examples/demo/verify.mjs
 | `dispatch(id, name, detail, cancelable)` | sends an event from a component |
 | `scope_css(css, scope)` | rewrites a `:host` stylesheet into prefixed form |
 | `mode` | `ShadowDom` (default) or `LightDom`; in light mode `styles` is scoped to the tag name |
+| `Stylesheet::parse(css)` / `compute(nodes)` | the cascade: selectors, specificity, `!important`, shorthand expansion, inheritance |
+| `layout(root, width, measure)` | block flow and flexbox geometry as a tree of border boxes |
+| `to_json` / `to_svg` | deterministic layout dump, and an SVG document |
+| `pipeline::run(view, css, width, measure)` | the whole chain in one call |
 
 Attribute names map both ways: `max-count` in HTML, `maxCount` in MoonBit.
 
@@ -96,6 +121,10 @@ moon build --target js --release             # browser-loadable JS
 ```
 core/    attribute parsing, lifecycle, props, rendering, CSS scoping, events, tag validation
 dom/     js-only adapter: DOM callbacks, shadow/light rendering, CustomEvent dispatch
+style/   CSS parsing, selector matching, cascade and computed values
+layout/  box tree and flexbox geometry, with an injected text measurer
+svg/     deterministic layout JSON and SVG output
+pipeline/ view tree -> styled nodes -> geometry
 examples/demo/                 four components, an interactive page and verify.mjs
 examples/generated-*/          CLI output committed so CI compiles and drift-checks it
 cmd/main/                      the CLI
@@ -111,6 +140,18 @@ them to the DOM. The adapter tests use a small in-repo DOM stub, so no npm depen
 - Tag name validation accepts an ASCII subset (the spec allows some non-ASCII).
 - `::slotted()` and `:host-context()` are shadow DOM semantics and are not rewritten.
 - No threads or async (MoonBit has no OS threads, and async is complete on native only).
+
+The layout engine covers a subset of CSS:
+
+- no adjacent-margin collapsing, no float, no absolute or relative positioning, no grid;
+- text does not wrap: a run wider than its container overflows it;
+- selectors cover type, class, id, compounds, descendant and child combinators, and lists; pseudo
+  classes, attribute selectors, sibling combinators and `@media` blocks are skipped with a warning;
+- percentages resolve against the containing block for box properties only, so percentage
+  `padding`, `margin` and `gap` are treated as zero, and `gap` uses the row value.
+
+Geometry is computed without a font stack or a browser, so it is not pixel-identical to a browser.
+It is meant for pre-layout, image export and regression testing, not for replacing rendering.
 
 ## License
 

@@ -1,5 +1,8 @@
 import {
   "chen333w/moon-element/core",
+  "chen333w/moon-element/examples/dashboard",
+  "chen333w/moon-element/pipeline",
+  "chen333w/moon-element/svg",
   "moonbitlang/core/argparse",
 }
 

@@ -6,6 +6,9 @@ import {
 }
 
 // Values
+pub fn layout(StyleNode, Double, (String, Double) -> (Double, Double)) -> LayoutBox
+
+pub fn layout_visit_count() -> Int32
 
 // Errors
 
@@ -20,6 +23,8 @@ pub(all) enum LayoutBox {
   Box(BoxData)
   Text(TextData)
 }
+pub fn LayoutBox::count(Self) -> Int32
+pub fn LayoutBox::find(Self, Int32) -> Rect?
 
 pub(all) struct Rect {
   x : Double
