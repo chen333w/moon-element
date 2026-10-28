@@ -34,6 +34,7 @@ pub(all) struct StyleNode {
   info : @style.ElementInfo
   style : @style.ComputedStyle
   children : Array[StyleNode]
+  text : String?
 }
 
 pub(all) struct TextData {

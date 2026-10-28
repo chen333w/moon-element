@@ -18,6 +18,8 @@ pub(all) struct StyleNode {
   info : @style.ElementInfo
   style : @style.ComputedStyle
   children : Array[StyleNode]
+  /// 文本节点为 Some，元素节点为 None；文本节点的 info.tag 固定为 "#text"
+  text : String?
 }
 
 ///|
