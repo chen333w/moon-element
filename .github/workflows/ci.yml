@@ -70,6 +70,9 @@ jobs:
           moon build --target js --release
           node examples/demo/verify.mjs
 
+      - name: "Layout: headless geometry, wrapping and SVG"
+        run: python3 examples/dashboard/verify_layout.py
+
       # Informational: the CLI entry point and example run paths are not unit-tested.
       - name: Coverage (js, informational)
         run: |

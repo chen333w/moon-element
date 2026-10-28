@@ -59,3 +59,30 @@ A step name containing `": "` makes a workflow YAML file unparseable, so validat
 
 `#|` multi-line literals are raw text; they do not interpolate `\{...}`. Generators have to build
 strings by concatenation. `const` needs an uppercase identifier, and `FixedArray` has no `push`.
+
+## Offscreen layout
+
+The pipeline stages are independent packages so each one can be tested on its own:
+`style` takes a flat, preorder array of `ElementInfo` (with a parent index) and returns one
+`ComputedStyle` per node; `layout` takes a styled tree and returns border boxes; `svg` serializes
+a box tree together with its styles.
+
+Decisions worth knowing:
+
+- `flex-basis` is a content-box width, as CSS defines it, so padding and border are added on top.
+  A row of cards only fits three per line when `basis + horizontal padding` fits the row.
+- A zero basis (`flex: 1`) never wraps, because a zero-width item always fits. Wrapping needs a
+  non-zero basis; `min-width: auto` for flex items is not implemented.
+- Text is measured through an injected function, so the engine has no font stack. The tests use a
+  deterministic monospace measurer; a browser build can pass canvas metrics instead.
+- JSON output is fixed-precision (two decimals) with a stable field order, which makes it usable
+  as a golden baseline in CI.
+- `layout_visit_count` counts node visits so complexity can be asserted without timing.
+
+Toolchain notes collected while building it:
+
+- `typealias`, `traitalias` and `fnalias` are gone; write `pub type A = B`.
+- Test-only dependencies live in a second import block: `import { "pkg" } for "test"`.
+- Whitebox tests must qualify the package: `@dashboard.dashboard_view()`, not `dashboard_view()`.
+- A top-level `pub let` is rejected; use `const` plus a `pub fn` accessor.
+- There is no `print`, only `println`.

@@ -114,6 +114,9 @@ moon test --target js --enable-coverage && moon coverage report -f summary
 moon run cmd/main -- x-counter               # generate a component skeleton (shadow DOM)
 moon run cmd/main -- x-panel --mode light    # generate a light DOM skeleton
 moon build --target js --release             # browser-loadable JS
+moon run cmd/main -- layout --width 640      # lay the dashboard out headlessly (JSON)
+moon run cmd/main -- layout --format svg     # ... or emit an SVG document
+python3 examples/dashboard/verify_layout.py  # 18 checks over the CLI output
 ```
 
 ## Layout
