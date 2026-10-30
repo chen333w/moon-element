@@ -19,6 +19,11 @@ jobs:
       - name: Version
         run: moon version --all
 
+      # The runner image ships a registry index that predates some dependencies;
+      # refresh it before resolving.
+      - name: Update the registry index
+        run: moon update
+
       - name: Check formatting
         run: moon fmt --check
 

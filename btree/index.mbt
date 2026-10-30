@@ -5,7 +5,14 @@
 //     leaf index cell      = varint payload 长度 + payload
 //     interior index cell  = 4 字节左孩子页号 + varint payload 长度 + payload
 // - 本地 payload 的阈值公式不同：索引页 X = ((usable-12)*64/255)-23，
-//   表叶页 X = usable-35。M/K 部分两者一样。
+//   表叶页 X = usable-35。M/K 与判定顺序两者一样：
+//     if P <= X: local = P
+//     else: M = ((usable-12)*32/255)-23
+//           K = M + ((P-M) % (usable-4))
+//           local = (K <= X) ? K : M
+//   为什么是 K：它让溢出部分正好是 usable-4 的整数倍，链上每页都满、末尾不留半页。
+//   （用「P <= K ? K : M」会算错本地长度：U=4096/P=5120 时 M=489、K=1028，
+//    实测溢出页号出现在 local=1028 处，按 489 取到的是 blob 内容而不是页号。）
 // - 全叶扫描只需要叶子的 payload，interior 页自身的 payload 直接忽略，只递归子树。
 
 ///|

@@ -1,9 +1,19 @@
 // 表 b-tree 遍历与溢出页拼接。
 //
 // leaf table cell：varint payload 总长 P、varint rowid、payload。
-//   P > usable-35 时，本地 payload 只放 usable-35 字节，随后 4 字节溢出页号。
 // interior table cell：4 字节左孩子页号、varint rowid（没有 payload）。
 // 溢出链每个页：4 字节下一页号 + 最多 usable-4 字节数据，页号 0 结束。
+//
+// 本地 payload 长度（文档 §1.6，等价 sqlite3 的 btreeComputeLocalSize）：
+//   表叶页阈值 X = usable - 35
+//   索引页阈值 X = ((usable-12)*64/255) - 23      （见 index.mbt）
+//   若 P <= X：local = P
+//   否则：M = ((usable-12)*32/255) - 23
+//         K = M + ((P - M) % (usable - 4))
+//         local = (K <= X) ? K : M
+// 注意不是「P <= K ? K : M」——K 的作用就是让超出本地的部分恰好是 usable-4 的
+// 整数倍，溢出链上每个页都装满，链尾不会留下半页；按 M 取会让溢出指针位置错位，
+// 表现为读回的 payload 只有本地那几十/几百字节（真库上就是这样抓到的）。
 //
 // 所有读取都带边界检查：坏文件只会得到空结果或截断结果，不会 panic。
 

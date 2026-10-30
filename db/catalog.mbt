@@ -101,7 +101,7 @@ pub fn Database::table(self : Database, name : String) -> TableInfo? {
 }
 
 ///|
-/// 整表扫描，按 rowid 升序（WITHOUT ROWID 表走索引 b-tree，暂时读不到）。
+/// 整表扫描，按 rowid 升序（WITHOUT ROWID 表走索引 b-tree）。
 pub fn Database::rows(self : Database, table : String) -> Array[Row] raise {
   let info = match self.table(table) {
     Some(info) => info
