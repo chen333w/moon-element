@@ -1,31 +1,18 @@
-// Learn more about moon.mod configuration:
-// https://docs.moonbitlang.com/en/latest/toolchain/moon/module.html
+name = "chen333w/moon-lite"
 
-name = "chen333w/moon-element"
-
-version = "0.2.0"
-
-readme = "README.mbt.md"
-
-repository = "https://github.com/chen333w/moon-element"
+version = "0.1.0"
 
 license = "Apache-2.0"
 
-keywords = [
-  "web-components",
-  "custom-elements",
-  "dom",
-  "html",
-  "frontend",
-  "layout",
-  "flexbox",
-  "svg",
-]
+readme = "README.mbt.md"
 
-// This module is a browser-facing library: the default backend is `js` so that
-// `moon check` / `moon build` exercise the real target. Pure-logic packages
-// stay target-agnostic and are covered by `moon test --target all`.
+repository = "https://github.com/chen333w/moon-lite"
 
-preferred_target = "js"
+keywords = [ "sqlite", "database", "storage", "b-tree", "parser", "wasm" ]
 
-description = "Web Components runtime for MoonBit, with an offscreen layout engine: the same view tree renders to custom elements or to geometry and SVG without a browser."
+
+description = "Pure MoonBit reader for the SQLite 3 file format: pages, b-trees, records and rows, with no C dependency and no FFI."
+
+import {
+  "moonbitlang/x@0.5.6",
+}

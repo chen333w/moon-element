@@ -1,0 +1,17 @@
+// Generated using `moon info`, DON'T EDIT IT
+package "chen333w/moon-lite/btree"
+
+// Values
+pub fn page_type(Bytes, Int32, Int32) -> Int32
+
+pub fn read_payload(Bytes, Int32, Int32, Int32) -> Bytes
+
+pub fn scan_table(Bytes, Int32, Int32) -> Array[(Int64, Int32, Int32)]
+
+// Errors
+
+// Types and methods
+
+// Type aliases
+
+// Traits

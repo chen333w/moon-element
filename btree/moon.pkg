@@ -1,0 +1,7 @@
+import {
+  "chen333w/moon-lite/format",
+}
+
+import {
+  "moonbitlang/x/fs",
+} for "test"

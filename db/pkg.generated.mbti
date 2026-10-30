@@ -1,0 +1,60 @@
+// Generated using `moon info`, DON'T EDIT IT
+package "chen333w/moon-lite/db"
+
+import {
+  "chen333w/moon-lite/format",
+}
+
+// Values
+pub fn row_json(String, Row, Bool) -> String
+
+pub fn table_json(TableInfo) -> String
+
+pub fn value_json(@format.Value) -> String
+
+// Errors
+pub suberror DbError {
+  DbError(String)
+}
+
+// Types and methods
+pub(all) struct ColumnInfo {
+  name : String
+  declared_type : String
+  not_null : Bool
+  primary_key : Bool
+}
+
+pub struct Database {
+  bytes : Bytes
+  page_size : Int32
+  encoding : Int32
+  version : Int32
+}
+pub fn Database::bytes(Self) -> Bytes
+pub fn Database::encoding(Self) -> Int32
+pub fn Database::encoding_label(Self) -> String
+pub fn Database::open(Bytes) -> Self raise
+pub fn Database::page_size(Self) -> Int32
+pub fn Database::rows(Self, String) -> Array[Row] raise
+pub fn Database::schema_sql(Self) -> String
+pub fn Database::sqlite_version(Self) -> Int32
+pub fn Database::table(Self, String) -> TableInfo?
+pub fn Database::tables(Self) -> Array[TableInfo]
+
+pub(all) struct Row {
+  rowid : Int64
+  values : Array[@format.Value]
+}
+
+pub(all) struct TableInfo {
+  name : String
+  sql : String
+  root_page : Int32
+  columns : Array[ColumnInfo]
+  without_rowid : Bool
+}
+
+// Type aliases
+
+// Traits

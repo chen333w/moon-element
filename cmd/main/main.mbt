@@ -1,177 +1,206 @@
-///|
-/// moon-element CLI: generates a custom element skeleton.
-///
-/// Usage:
-/// ```text
-/// moon run cmd/main -- x-counter
-/// moon run cmd/main -- --help
-/// ```
+// moon-lite CLI：把库文件读成确定性 JSON。tools/verify_sqlite.py 也走这套输出对拍。
 
 ///|
-fn usage(cmd : @argparse.Command) -> Unit {
-  println(cmd.render_help())
-  println("")
-  println("Examples:")
-  println(
-    "  moon run cmd/main -- x-counter                 # shadow DOM (default)",
-  )
-  println(
-    "  moon run cmd/main -- x-panel --mode light      # light DOM + scope_css isolation",
-  )
-  println(
-    "  moon run cmd/main -- layout --width 640        # lay the dashboard out without a browser",
-  )
-  println(
-    "  moon run cmd/main -- layout --format svg       # ... and emit an SVG document",
-  )
-  println("")
-  println(
-    "Custom element name rules: must contain a hyphen; only lowercase letters,",
-  )
-  println(
-    "digits, -, ., _; must not start or end with a hyphen; must not start with xml;",
-  )
-  println("must not be a reserved name.")
+fn usage() -> Unit {
+  eprintln("moon-lite: read a SQLite 3 database file, no C dependency")
+  eprintln("")
+  eprintln("Usage:")
+  eprintln("  moon run cmd/main -- schema <file.db>")
+  eprintln("  moon run cmd/main -- dump <file.db> [--table NAME] [--limit N]")
+  eprintln("")
+  eprintln("  schema   one JSON line: page size, encoding, tables and columns")
+  eprintln("  dump     one JSON line per row: table, rowid, values")
 }
 
 ///|
-fn run() -> Unit {
-  let cmd = @argparse.Command(
-    "moon-element",
-    options=[
-      @argparse.OptionArg(
-        "mode",
-        long="mode",
-        about="Render mode: shadow (default) or light",
-      ),
-      @argparse.OptionArg(
-        "width",
-        long="width",
-        about="Page width for `layout` (default 640)",
-      ),
-      @argparse.OptionArg(
-        "format",
-        long="format",
-        about="`layout` output: json (default) or svg",
-      ),
-    ],
-    positionals=[@argparse.PositionArg("tag")],
-    about="Generate a MoonBit custom element skeleton (standard Web Components)",
-  )
-  let matches = cmd.parse() catch { _ => return usage(cmd) }
-  // A misspelled --mode must fail: silently defaulting generates code the caller did not ask for
-  let mode = if matches.values is { "mode": [raw, ..], .. } {
-    match @core.RenderMode::parse(raw) {
-      Some(m) => m
-      None => {
-        println("Error: --mode only accepts shadow or light, got \"\{raw}\"")
-        println("")
-        return usage(cmd)
-      }
-    }
-  } else {
-    @core.ShadowDom
-  }
-  if matches.values is { "tag": [tag, ..], .. } {
-    if tag == "layout" {
-      return run_layout(matches)
-    }
-    match @core.component_skeleton(tag, mode~) {
-      // No trailing newline here (println adds one), so the written file matches what
-      // moon fmt normalizes to; the CI drift check relies on that.
-      Some(code) => println(code)
-      None => {
-        println("Error: \"\{tag}\" is not a valid custom element name.")
-        println("")
-        usage(cmd)
-      }
-    }
-  } else {
-    usage(cmd)
+priv struct Options {
+  file : String
+  table : String?
+  limit : Int?
+}
+
+///|
+fn char_or(s : String, i : Int32) -> Char {
+  match s.get_char(i) {
+    Some(c) => c
+    None => ' '
   }
 }
 
 ///|
-fn main {
-  run()
-}
-
-///|
-/// 解析 CLI 里的非负小数（例如 640 或 640.5）；非法输入返回 None。
-fn parse_number(raw : String) -> Double? {
-  if raw.length() == 0 {
+fn parse_count(text : String) -> Int? {
+  let n = text.char_length()
+  if n == 0 {
     return None
   }
-  let mut seen_dot = false
-  let mut digits = 0
-  for ch in raw.iter() {
-    if ch == '.' {
-      if seen_dot {
-        return None
-      }
-      seen_dot = true
-    } else if ch >= '0' && ch <= '9' {
-      digits = digits + 1
-    } else {
+  let mut value = 0
+  let mut i : Int32 = 0
+  while i < n {
+    let v = char_or(text, i).to_int()
+    if v < 48 || v > 57 {
       return None
     }
-  }
-  if digits == 0 {
-    return None
-  }
-  let mut value = 0.0
-  let mut scale = 1.0
-  let mut after_dot = false
-  for ch in raw.iter() {
-    if ch == '.' {
-      after_dot = true
-      continue
+    value = value * 10 + (v - 48)
+    if value > 100000000 {
+      return None
     }
-    let digit = (ch.to_int() - '0'.to_int()).to_double()
-    if after_dot {
-      scale = scale / 10.0
-      value = value + digit * scale
-    } else {
-      value = value * 10.0 + digit
-    }
+    i = i + 1
   }
   Some(value)
 }
 
 ///|
-/// `layout`：把内置仪表盘布局成几何，输出确定性 JSON 或 SVG。
-fn run_layout(matches : @argparse.Matches) -> Unit {
-  let width = if matches.values is { "width": [raw, ..], .. } {
-    match parse_number(raw) {
-      Some(w) => w
-      None => {
-        println("Error: --width expects a positive number, got \"\{raw}\"")
-        return
+/// 子命令之后的参数：一个文件位置，可选 --table / --limit。
+fn parse_options(args : Array[String], from : Int) -> Options? {
+  let mut file : String? = None
+  let mut table : String? = None
+  let mut limit : Int? = None
+  let mut i = from
+  while i < args.length() {
+    let arg = args[i]
+    if arg == "--table" {
+      if i + 1 >= args.length() {
+        return None
+      }
+      table = Some(args[i + 1])
+      i = i + 2
+    } else if arg == "--limit" {
+      if i + 1 >= args.length() {
+        return None
+      }
+      match parse_count(args[i + 1]) {
+        Some(n) => limit = Some(n)
+        None => return None
+      }
+      i = i + 2
+    } else if arg == "--help" || arg == "-h" || arg.has_prefix("--") {
+      return None
+    } else {
+      match file {
+        Some(_) => return None
+        None => {
+          file = Some(arg)
+          i = i + 1
+        }
       }
     }
+  }
+  match file {
+    Some(path) => Some({ file: path, table: table, limit: limit })
+    None => None
+  }
+}
+
+///|
+fn read_bytes(path : String) -> Bytes? {
+  try {
+    Some(@fs.read_file_to_bytes(path))
+  } catch {
+    _ => None
+  }
+}
+
+///|
+fn schema_json(db : @db.Database) -> String {
+  let mut acc = "{\"page_size\":" + db.page_size().to_string()
+  acc = acc + ",\"encoding\":\"" + db.encoding_label() + "\""
+  acc = acc + ",\"sqlite_version\":" + db.sqlite_version().to_string()
+  acc = acc + ",\"tables\":["
+  let mut first = true
+  for table in db.tables() {
+    if !first {
+      acc = acc + ","
+    }
+    first = false
+    acc = acc + @db.table_json(table)
+  }
+  acc + "]}"
+}
+
+///|
+fn dump_lines(db : @db.Database, options : Options) -> Array[String] raise {
+  let out : Array[String] = []
+  for table in db.tables() {
+    let wanted = match options.table {
+      Some(name) => name == table.name
+      None => true
+    }
+    if wanted {
+      let mut emitted = 0
+      for row in db.rows(table.name) {
+        let full = match options.limit {
+          Some(n) => emitted >= n
+          None => false
+        }
+        if !full {
+          out.push(@db.row_json(table.name, row, table.without_rowid))
+          emitted = emitted + 1
+        }
+      }
+    }
+  }
+  out
+}
+
+///|
+fn run(args : Array[String]) -> Int raise {
+  let mut index = 0
+  let mut command = ""
+  while index < args.length() {
+    let arg = args[index]
+    if arg == "schema" || arg == "dump" {
+      command = arg
+      break
+    }
+    index = index + 1
+  }
+  if command == "" {
+    usage()
+    return 2
+  }
+  let options = match parse_options(args, index + 1) {
+    Some(o) => o
+    None => {
+      usage()
+      return 2
+    }
+  }
+  if !@fs.path_exists(options.file) {
+    eprintln("Error: no such file: \{options.file}")
+    return 2
+  }
+  let bytes = match read_bytes(options.file) {
+    Some(b) => b
+    None => {
+      eprintln("Error: cannot read \{options.file}")
+      return 2
+    }
+  }
+  let db = @db.Database::open(bytes) catch {
+    _ => {
+      eprintln("Error: \{options.file} is not a readable SQLite 3 database")
+      return 2
+    }
+  }
+  if command == "schema" {
+    println(schema_json(db))
   } else {
-    640.0
+    for line in dump_lines(db, options) {
+      println(line)
+    }
   }
-  if width <= 0.0 {
-    println("Error: --width must be greater than 0")
-    return
+  0
+}
+
+///|
+fn main {
+  let code = run(@env.args()) catch {
+    _ => {
+      eprintln(
+        "Error: cannot read the database (corrupt file, or a table the reader does not support)",
+      )
+      2
+    }
   }
-  let format = if matches.values is { "format": [raw, ..], .. } {
-    raw
-  } else {
-    "json"
-  }
-  let (root, box) = @pipeline.run(
-    @dashboard.dashboard_view(),
-    @dashboard.dashboard_css(),
-    width,
-    @pipeline.measure_monospace,
-  )
-  if format == "json" {
-    println(@svg.to_json(root, box))
-  } else if format == "svg" {
-    println(@svg.to_svg(root, box))
-  } else {
-    println("Error: --format only accepts json or svg, got \"\{format}\"")
-  }
+  @sys.exit(code)
 }

@@ -1,44 +1,22 @@
-# CI gate for the MoonBit project. Structure follows moonbit-community/starter check.yml;
-# action versions are pinned to commit SHAs.
 name: ci
 
 on:
   push:
     branches: [main]
   pull_request:
-  workflow_dispatch:
-
-permissions:
-  contents: read
-
-concurrency:
-  group: ${{ github.workflow }}-${{ github.ref }}
-  cancel-in-progress: true
 
 jobs:
-  check:
+  ci:
     runs-on: ubuntu-latest
-    timeout-minutes: 15
-    defaults:
-      run:
-        shell: bash
     steps:
-      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
-        with:
-          persist-credentials: false
-
-      # The js backend tests need a JS runtime.
-      - uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7.1.0
-        with:
-          node-version: '24'
-          package-manager-cache: false
+      - uses: actions/checkout@v4
 
       - name: Install MoonBit
         run: |
           curl -fsSL https://cli.moonbitlang.com/install/unix.sh | bash
           echo "$HOME/.moon/bin" >> "$GITHUB_PATH"
 
-      - name: Toolchain version
+      - name: Version
         run: moon version --all
 
       - name: Check formatting
@@ -47,34 +25,10 @@ jobs:
       - name: Check all backends
         run: moon check --target all --deny-warn
 
-      # Public interfaces (.mbti) must match the sources and be committed.
-      - name: Check public interfaces
-        run: |
-          moon info --target all
-          git diff --exit-code
-          test -z "$(git ls-files --others --exclude-standard -- '*.mbti')"
-
       - name: Test all backends
         run: moon test --target all --deny-warn
 
-      # Generator drift check: committed examples must match current CLI output.
-      - name: "CLI: generated skeleton matches committed example"
-        run: |
-          moon run cmd/main -- x-counter > /tmp/generated-component.mbt
-          diff -u examples/generated-x-counter/component.mbt /tmp/generated-component.mbt
-          moon run cmd/main -- x-light-panel --mode light > /tmp/generated-light.mbt
-          diff -u examples/generated-light-panel/component.mbt /tmp/generated-light.mbt
-
-      - name: Build demo and verify the artifact headlessly
-        run: |
-          moon build --target js --release
-          node examples/demo/verify.mjs
-
-      - name: "Layout: headless geometry, wrapping and SVG"
-        run: python3 examples/dashboard/verify_layout.py
-
-      # Informational: the CLI entry point and example run paths are not unit-tested.
-      - name: Coverage (js, informational)
-        run: |
-          moon test --target js --enable-coverage
-          moon coverage report -f summary
+      # The conformance evidence: Python's sqlite3 creates the databases, our reader
+      # dumps them, and every row and value is compared.
+      - name: Differential conformance against SQLite
+        run: python3 tools/verify_sqlite.py

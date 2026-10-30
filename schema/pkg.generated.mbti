@@ -1,0 +1,21 @@
+// Generated using `moon info`, DON'T EDIT IT
+package "chen333w/moon-lite/schema"
+
+// Values
+pub fn has_without_rowid(String) -> Bool
+
+pub fn parse_columns(String) -> Array[ParsedColumn]
+
+// Errors
+
+// Types and methods
+pub(all) struct ParsedColumn {
+  name : String
+  declared_type : String
+  not_null : Bool
+  primary_key : Bool
+}
+
+// Type aliases
+
+// Traits

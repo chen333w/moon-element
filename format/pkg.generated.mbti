@@ -1,0 +1,44 @@
+// Generated using `moon info`, DON'T EDIT IT
+package "chen333w/moon-lite/format"
+
+// Values
+pub fn be_i32(Bytes, Int32) -> Int32
+
+pub fn be_i64(Bytes, Int32) -> Int64
+
+pub fn be_u16(Bytes, Int32) -> Int32
+
+pub fn be_u32(Bytes, Int32) -> UInt32
+
+pub fn decode_record(Bytes, Int32, Int32) -> Array[Value]
+
+pub fn decode_record_with_encoding(Bytes, Int32, Int32, Int32) -> RecordResult
+
+pub fn decode_text(Bytes, Int32, Int32, Int32) -> String
+
+pub fn decode_utf16(Bytes, Int32, Int32, Bool) -> String
+
+pub fn decode_utf8(Bytes, Int32, Int32) -> String
+
+pub fn varint(Bytes, Int32) -> (Int64, Int32)
+
+// Errors
+
+// Types and methods
+pub(all) struct RecordResult {
+  values : Array[Value]
+  malformed : Bool
+}
+
+pub(all) enum Value {
+  Null
+  Int(Int64)
+  Real(Double)
+  Text(String)
+  Blob(Bytes)
+}
+pub fn Value::type_name(Self) -> String
+
+// Type aliases
+
+// Traits

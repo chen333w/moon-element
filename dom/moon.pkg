@@ -1,5 +1,0 @@
-supported_targets = "js"
-
-import {
-  "chen333w/moon-element/core",
-}
