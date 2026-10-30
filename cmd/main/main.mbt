@@ -277,8 +277,7 @@ fn char_of(s : String, i : Int32) -> Char {
 /// 把 old 全部替换成 new；只为 SQL 的单引号双写这种小场景服务。
 fn replace_all(text : String, old : Char, new : String) -> String {
   let out : Array[Char] = []
-  for i in 0..<text.length() {
-    let c = char_of(text, i)
+  for c in text {
     if c == old {
       for j in 0..<new.length() {
         out.push(char_of(new, j))
@@ -294,8 +293,7 @@ fn replace_all(text : String, old : Char, new : String) -> String {
 /// RFC 4180：含逗号、引号、换行的字段要用双引号包起来，内部引号写成两个。
 fn csv_field(raw : String) -> String {
   let mut needs_quotes = false
-  for i in 0..<raw.length() {
-    let c = char_of(raw, i)
+  for c in raw {
     if c == ',' || c == '"' || c == '\n' || c == '\r' {
       needs_quotes = true
     }
@@ -442,8 +440,8 @@ fn json_string(raw : String) -> String {
     out.push(digits[(code >> 4) & 15])
     out.push(digits[code & 15])
   }
-  for i in 0..<raw.length() {
-    let c = char_of(raw, i)
+  // 按字符（码点）遍历：length() 是 UTF-16 单位数，用下标取字符会把代理对拆坏
+  for c in raw {
     let code = c.to_int()
     if c == '"' {
       out.push('\\')
@@ -464,8 +462,13 @@ fn json_string(raw : String) -> String {
       push_hex4(code)
     } else if code < 0x7f {
       out.push(c)
-    } else {
+    } else if code <= 0xffff {
       push_hex4(code)
+    } else {
+      // BMP 之外要拆成 UTF-16 代理对，否则解析器读不回原字符
+      let offset = code - 0x10000
+      push_hex4(0xd800 + (offset >> 10))
+      push_hex4(0xdc00 + (offset & 0x3ff))
     }
   }
   out.push('"')

@@ -15,6 +15,23 @@ The CLI contract under test (see cmd/main):
 
     value types: null (no "value"), integer, real, text, blob (hex string)
 
+    moon run cmd/main --target native -- dump <file.db> --format csv
+        RFC 4180 CSV: a header row of column names, then one row per row. NULL is an empty
+        field, blobs are lowercase hex, fields with a comma / quote / newline are quoted and
+        inner quotes doubled.
+
+    moon run cmd/main --target native -- dump <file.db> --format sql
+        self-contained SQL: CREATE TABLE statements from sqlite_master, then
+        INSERT INTO "t" VALUES (...);  Literals: NULL, integers, reals, 'text' (quotes doubled),
+        x'hex' blobs. Executing the output must rebuild equivalent rows.
+
+    moon run cmd/main --target native -- stats <file.db>
+        one JSON line: file_bytes, page_size, page_count, encoding, sqlite_version and
+        tables[{name, rows, without_rowid}]
+
+    WAL databases (header read/write version = 2) are rejected on purpose: their newest frames
+    live in the -wal file, so the CLI must exit non-zero and mention WAL.
+
 Exit code is 0 only when every database matches; otherwise the first difference of each failing
 database is printed with its table, rowid and column.
 
@@ -37,6 +54,8 @@ Set MOON_CLI to a binary path to skip the build as well.
 
 from __future__ import annotations
 
+import csv
+import io
 import json
 import os
 import pathlib
@@ -56,12 +75,14 @@ ENCODINGS = {1: "UTF-8", 2: "UTF-16le", 3: "UTF-16be"}
 
 
 class Db:
-    """One fixture: where it lives, plus how to build it."""
+    """One fixture: where it lives, how to build it, and whether an error is the expected answer."""
 
-    def __init__(self, name: str, build):
+    def __init__(self, name: str, build, expect_error=None):
         self.name = name
         self.build = build
         self.path = None
+        # 期望 CLI 明确报错（而不是读出数据）时，写错误信息里必须出现的字样
+        self.expect_error = expect_error
 
 
 def new_conn(path, page_size=None, encoding=None):
