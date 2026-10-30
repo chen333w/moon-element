@@ -12,7 +12,7 @@ fn load_fixture(name : String) -> Bytes raise {
 }
 
 ///|
-fn byte_at(bytes : Bytes, i : Int) -> Int {
+fn byte_at(bytes : Bytes, i : Int32) -> Int32 {
   if i >= 0 && i < bytes.length() {
     bytes[i].to_int()
   } else {
@@ -24,7 +24,7 @@ fn byte_at(bytes : Bytes, i : Int) -> Int {
 // 在 payload 里找一段长度 >= pairs*2 的 0xab,0xcd 交替字节。
 // fixture 里的 blob 就是 b"\xab\xcd" * 600，用来确认溢出链拼出来的字节确实
 // 是当初写进去的内容，而不只是长度对。
-fn has_blob_run(bytes : Bytes, pairs : Int) -> Bool {
+fn has_blob_run(bytes : Bytes, pairs : Int32) -> Bool {
   let n = bytes.length()
   let need = pairs * 2
   let mut start = 0
@@ -33,11 +33,7 @@ fn has_blob_run(bytes : Bytes, pairs : Int) -> Bool {
       let mut i = 0
       let mut ok = true
       while ok && i < need {
-        let want = if i % 2 == 0 {
-          0xab
-        } else {
-          0xcd
-        }
+        let want = if i % 2 == 0 { 0xab } else { 0xcd }
         if byte_at(bytes, start + i) != want {
           ok = false
         }
@@ -98,7 +94,10 @@ test "real fixture: a table that fits in one leaf page" {
   assert_eq(recs.length(), 3)
   for i in 0..<recs.length() {
     assert_eq(recs[i].0, (i + 1).to_int64())
-    assert_eq(@btree.read_payload(bytes, page_size, recs[i].1, recs[i].2).length(), recs[i].2)
+    assert_eq(
+      @btree.read_payload(bytes, page_size, recs[i].1, recs[i].2).length(),
+      recs[i].2,
+    )
   }
 }
 
@@ -110,4 +109,17 @@ test "real fixture: WITHOUT ROWID lives in an index btree" {
   assert_eq(@btree.page_type(bytes, 2, page_size), 10)
   // 表遍历只处理表 b-tree，遇到索引 b-tree 必须返回空而不是垃圾。
   assert_eq(@btree.scan_table(bytes, page_size, 2).length(), 0)
+  // 索引入口能读到 5 行，每行 payload 都能完整读回。
+  let recs = @btree.scan_index_leaves(bytes, page_size, 2)
+  assert_eq(recs.length(), 5)
+  for i in 0..<recs.length() {
+    assert_true(recs[i].1 > 0)
+    let payload = @btree.read_index_payload(
+      bytes,
+      page_size,
+      recs[i].0,
+      recs[i].1,
+    )
+    assert_eq(payload.length(), recs[i].1)
+  }
 }

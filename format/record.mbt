@@ -14,13 +14,13 @@
 priv enum Shape {
   SNull
   /// 1/2/3/4/6/8 字节的大端有符号整数
-  SInteger(Int)
+  SInteger(Int32)
   SZero
   SOne
   SReal
   /// 数据区字节数
-  SBlob(Int)
-  SText(Int)
+  SBlob(Int32)
+  SText(Int32)
   /// 10/11：SQLite 内部保留，长度未知，无法继续
   SReserved
   SInvalid
@@ -35,13 +35,13 @@ pub(all) struct RecordResult {
 
 ///|
 /// 区间是否完整落在 buffer 内（用 Int64 相加，避免接近上限时溢出）。
-fn fits(bytes : Bytes, at : Int, n : Int) -> Bool {
+fn fits(bytes : Bytes, at : Int32, n : Int32) -> Bool {
   at >= 0 && n >= 0 && at.to_int64() + n.to_int64() <= bytes.length().to_int64()
 }
 
 ///|
 /// 带边界检查的 varint，语义与 cursor.mbt 的 varint 一致，只是越界返回 None。
-fn read_varint(bytes : Bytes, at : Int, limit : Int) -> (Int64, Int)? {
+fn read_varint(bytes : Bytes, at : Int32, limit : Int32) -> (Int64, Int32)? {
   if at < 0 || at >= limit {
     return None
   }
@@ -67,7 +67,7 @@ fn read_varint(bytes : Bytes, at : Int, limit : Int) -> (Int64, Int)? {
 
 ///|
 /// 大端有符号整数：n ∈ [1,8]，按最高位做符号扩展。
-fn read_be_int(bytes : Bytes, at : Int, n : Int) -> Int64? {
+fn read_be_int(bytes : Bytes, at : Int32, n : Int32) -> Int64? {
   if n <= 0 || n > 8 || !fits(bytes, at, n) {
     return None
   }
@@ -80,14 +80,14 @@ fn read_be_int(bytes : Bytes, at : Int, n : Int) -> Int64? {
   if n < 8 {
     // 先左移把符号位顶到最高位，再算术右移回来
     let shift = (8 - n) * 8
-    v = (v << shift) >> shift
+    v = v << shift >> shift
   }
   Some(v)
 }
 
 ///|
 /// serial type 7：IEEE754 大端 double。
-fn read_be_double(bytes : Bytes, at : Int) -> Double? {
+fn read_be_double(bytes : Bytes, at : Int32) -> Double? {
   match read_be_int(bytes, at, 8) {
     Some(bits) => Some(bits.reinterpret_as_double())
     None => None
@@ -95,7 +95,7 @@ fn read_be_double(bytes : Bytes, at : Int) -> Double? {
 }
 
 ///|
-fn slice_bytes(bytes : Bytes, at : Int, n : Int) -> Bytes {
+fn slice_bytes(bytes : Bytes, at : Int32, n : Int32) -> Bytes {
   let out : Array[Byte] = []
   let mut i = 0
   while i < n {
@@ -159,9 +159,9 @@ fn shape_of(serial : Int64) -> Shape {
 /// 读 record，文本按给定数据库编码解（1=UTF-8、2=UTF-16LE、3=UTF-16BE）。
 pub fn decode_record_with_encoding(
   bytes : Bytes,
-  offset : Int,
-  ncols : Int,
-  encoding : Int,
+  offset : Int32,
+  ncols : Int32,
+  encoding : Int32,
 ) -> RecordResult {
   let total = if ncols < 0 { 0 } else { ncols }
   let values : Array[Value] = []
@@ -171,12 +171,12 @@ pub fn decode_record_with_encoding(
     k = k + 1
   }
   if total == 0 {
-    return { values, malformed: false }
+    return { values, malformed: false, }
   }
   let len = bytes.length()
   // 头长度：varint，包含它自身的字节
   let head = match read_varint(bytes, offset, len) {
-    None => return { values, malformed: true }
+    None => return { values, malformed: true, }
     Some(p) => p
   }
   let hdr_size = head.0
@@ -184,7 +184,7 @@ pub fn decode_record_with_encoding(
   if hdr_size < 1L ||
     hdr_size < size_width.to_int64() ||
     offset.to_int64() + hdr_size > len.to_int64() {
-    return { values, malformed: true }
+    return { values, malformed: true, }
   }
   let hdr_end = offset + hdr_size.to_int()
   // 每列一个 serial type；记录里的列数可能少于 ncols（尾部列省略）
@@ -247,12 +247,16 @@ pub fn decode_record_with_encoding(
     }
     i = i + 1
   }
-  { values, malformed }
+  { values, malformed, }
 }
 
 ///|
 /// 读 record，文本按 UTF-8 解（SQLite 默认编码）。
 /// 返回值长度固定为 ncols：缺的列补 Null，畸形输入见文件头注释的容错规则。
-pub fn decode_record(bytes : Bytes, offset : Int, ncols : Int) -> Array[Value] {
+pub fn decode_record(
+  bytes : Bytes,
+  offset : Int32,
+  ncols : Int32,
+) -> Array[Value] {
   decode_record_with_encoding(bytes, offset, ncols, 1).values
 }

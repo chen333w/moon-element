@@ -1,10 +1,22 @@
 // 确定性 JSON 输出：字段顺序固定，值按 SQLite 的存储类渲染。
 
 ///|
-fn json_escape(s : String) -> String {
-  let hexdg : Array[Char] = [
+fn hex4(out : Array[Char], value : Int32) -> Unit {
+  let digits : Array[Char] = [
     '0', '1', '2', '3', '4', '5', '6', '7', '8', '9', 'a', 'b', 'c', 'd', 'e', 'f',
   ]
+  out.push('\\')
+  out.push('u')
+  out.push(digits[(value >> 12) & 0xf])
+  out.push(digits[(value >> 8) & 0xf])
+  out.push(digits[(value >> 4) & 0xf])
+  out.push(digits[value & 0xf])
+}
+
+///|
+/// 转义成纯 ASCII 的 JSON 文本：非 ASCII 一律走 \uXXXX（BMP 外的字符拆成代理对），
+/// 这样输出与运行时字符串编码无关，对拍脚本用 json.loads 就能读回原字符。
+fn json_escape(s : String) -> String {
   let out : Array[Char] = []
   for c in s {
     let v = c.to_int()
@@ -23,13 +35,14 @@ fn json_escape(s : String) -> String {
     } else if v == 9 {
       out.push('\\')
       out.push('t')
-    } else if v < 32 {
-      out.push('\\')
-      out.push('u')
-      out.push('0')
-      out.push('0')
-      out.push(hexdg[v / 16])
-      out.push(hexdg[v % 16])
+    } else if v < 32 || v > 126 {
+      if v <= 0xFFFF {
+        hex4(out, v)
+      } else {
+        let x = v - 0x10000
+        hex4(out, 0xD800 + (x >> 10))
+        hex4(out, 0xDC00 + (x & 0x3FF))
+      }
     } else {
       out.push(c)
     }
@@ -85,9 +98,12 @@ pub fn value_json(value : @format.Value) -> String {
   match value {
     @format.Value::Null => "{\"type\":\"null\"}"
     @format.Value::Int(v) => "{\"type\":\"integer\",\"value\":\{v}}"
-    @format.Value::Real(d) => "{\"type\":\"real\",\"value\":" + json_real(d) + "}"
-    @format.Value::Text(s) => "{\"type\":\"text\",\"value\":\"" + json_escape(s) + "\"}"
-    @format.Value::Blob(b) => "{\"type\":\"blob\",\"value\":\"" + hex_of(b) + "\"}"
+    @format.Value::Real(d) =>
+      "{\"type\":\"real\",\"value\":" + json_real(d) + "}"
+    @format.Value::Text(s) =>
+      "{\"type\":\"text\",\"value\":\"" + json_escape(s) + "\"}"
+    @format.Value::Blob(b) =>
+      "{\"type\":\"blob\",\"value\":\"" + hex_of(b) + "\"}"
   }
 }
 

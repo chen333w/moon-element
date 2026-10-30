@@ -33,12 +33,12 @@ fn varint_at(bytes : Bytes, at : Int32, limit : Int32) -> (Int64, Int32)? {
 }
 
 ///|
-// 本地 payload 长度（官方文档 §1.6）。
-// 阈值确实是 usable-35（X）；超过 X 时 SQLite 并不把本地部分固定成 X，
-// 而是用 M/K 公式让记录在页内分布得更均匀：
+// 本地 payload 长度（官方文档 §1.6，对应 sqlite3 的 btreeComputeLocalSize）。
+// 阈值是 X = usable-35；超过 X 时用 M/K 公式：
 //   M = ((usable-12)*32/255) - 23
 //   K = M + ((P-M) % (usable-4))
-//   P <= K 时本地部分 = P（其实是 K 截到 P），否则 = M。
+//   local = (K <= X) ? K : M
+// 注意不是「P <= K ? K : M」——那会把本地长度算成 M，溢出指针位置就偏了。
 fn local_payload_len(page_size : Int32, payload_size : Int32) -> Int32 {
   let x = if page_size > 35 { page_size - 35 } else { 0 }
   if payload_size <= x {
@@ -48,8 +48,8 @@ fn local_payload_len(page_size : Int32, payload_size : Int32) -> Int32 {
     let m = if m0 < 0 { 0 } else { m0 }
     let span = if page_size > 4 { page_size - 4 } else { 1 }
     let k = m + (payload_size - m) % span
-    if payload_size <= k {
-      payload_size
+    if k <= x {
+      k
     } else {
       m
     }
@@ -178,17 +178,22 @@ fn copy_range(bytes : Bytes, at : Int32, n : Int32, out : Array[Byte]) -> Unit {
 }
 
 ///|
-pub fn read_payload(
+fn read_payload_kind(
   bytes : Bytes,
   page_size : Int32,
   payload_offset : Int32,
   payload_size : Int32,
+  index_pages : Bool,
 ) -> Bytes {
   let out : Array[Byte] = []
   if payload_size <= 0 || page_size <= 0 {
     return Bytes::from_array(out[:])
   }
-  let local_len = local_payload_len(page_size, payload_size)
+  let local_len = if index_pages {
+    local_payload_len_index(page_size, payload_size)
+  } else {
+    local_payload_len(page_size, payload_size)
+  }
   if local_len <= 0 {
     return Bytes::from_array(out[:])
   }
@@ -218,4 +223,15 @@ pub fn read_payload(
     }
   }
   Bytes::from_array(out[:])
+}
+
+///|
+/// 表 b-tree 的 payload 读取：本地部分 + 溢出链。
+pub fn read_payload(
+  bytes : Bytes,
+  page_size : Int32,
+  payload_offset : Int32,
+  payload_size : Int32,
+) -> Bytes {
+  read_payload_kind(bytes, page_size, payload_offset, payload_size, false)
 }

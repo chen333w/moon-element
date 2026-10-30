@@ -12,7 +12,7 @@ pub(all) struct ColumnInfo {
 pub(all) struct TableInfo {
   name : String
   sql : String
-  root_page : Int
+  root_page : Int32
   columns : Array[ColumnInfo]
   /// WITHOUT ROWID 表是索引 b-tree，没有 rowid。
   without_rowid : Bool

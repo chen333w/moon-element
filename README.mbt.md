@@ -4,7 +4,7 @@ A pure MoonBit reader for the [SQLite 3 file format](https://www.sqlite.org/file
 reads a database file as bytes and gives back tables, columns and rows. No C library, no FFI, no
 `sqlite3` binary — so it works on every backend, including wasm and the browser.
 
-```moonbit
+```moonbit nocheck
 let bytes = @fs.read_file("example.db")          // any way you get the bytes
 let db = @db.Database::open(bytes)
 for table in db.tables() {
@@ -24,9 +24,10 @@ for table in db.tables() {
 - table b-trees: leaf and interior cells, the cell pointer array, rowid order
 - record decoding: every serial type, including 1/2/3/4/6/8-byte integers, IEEE-754 doubles,
   UTF-8 and UTF-16 text
-- payload overflow chains: a record larger than the local payload area spills into overflow pages,
-  with the local length following the M/K rule from the format documentation rather than the
-  spill threshold
+- payload overflow chains: a record larger than the local payload area spills into overflow pages.
+  The local length is `M` or `K` depending on the spill threshold `X` (`M = ((U-12)*32/255)-23`,
+  `K = M + ((P-M) % (U-4))`, `local = if K <= X { K } else { M }`), which keeps every overflow-link
+  segment a whole number of `U-4` bytes. Index pages use a different threshold than table leaves.
 
 ## What it does not do
 

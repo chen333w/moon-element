@@ -16,7 +16,7 @@ fn usage() -> Unit {
 priv struct Options {
   file : String
   table : String?
-  limit : Int?
+  limit : Int32?
 }
 
 ///|
@@ -28,7 +28,7 @@ fn char_or(s : String, i : Int32) -> Char {
 }
 
 ///|
-fn parse_count(text : String) -> Int? {
+fn parse_count(text : String) -> Int32? {
   let n = text.char_length()
   if n == 0 {
     return None
@@ -51,10 +51,10 @@ fn parse_count(text : String) -> Int? {
 
 ///|
 /// 子命令之后的参数：一个文件位置，可选 --table / --limit。
-fn parse_options(args : Array[String], from : Int) -> Options? {
+fn parse_options(args : Array[String], from : Int32) -> Options? {
   let mut file : String? = None
   let mut table : String? = None
-  let mut limit : Int? = None
+  let mut limit : Int32? = None
   let mut i = from
   while i < args.length() {
     let arg = args[i]
@@ -86,16 +86,14 @@ fn parse_options(args : Array[String], from : Int) -> Options? {
     }
   }
   match file {
-    Some(path) => Some({ file: path, table: table, limit: limit })
+    Some(path) => Some({ file: path, table, limit, })
     None => None
   }
 }
 
 ///|
 fn read_bytes(path : String) -> Bytes? {
-  try {
-    Some(@fs.read_file_to_bytes(path))
-  } catch {
+  Some(@fs.read_file_to_bytes(path)) catch {
     _ => None
   }
 }
@@ -143,7 +141,7 @@ fn dump_lines(db : @db.Database, options : Options) -> Array[String] raise {
 }
 
 ///|
-fn run(args : Array[String]) -> Int raise {
+fn run(args : Array[String]) -> Int32 raise {
   let mut index = 0
   let mut command = ""
   while index < args.length() {

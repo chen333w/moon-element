@@ -13,10 +13,7 @@ fn has_magic(bytes : Bytes) -> Bool {
   let mut i : Int32 = 0
   while i < n {
     match magic.get_char(i) {
-      Some(c) =>
-        if bytes[i].to_int() != c.to_int() {
-          return false
-        }
+      Some(c) => if bytes[i].to_int() != c.to_int() { return false }
       None => ()
     }
     i = i + 1
@@ -25,7 +22,7 @@ fn has_magic(bytes : Bytes) -> Bool {
 }
 
 ///|
-fn is_power_of_two(v : Int) -> Bool {
+fn is_power_of_two(v : Int32) -> Bool {
   v > 0 && (v & (v - 1)) == 0
 }
 
@@ -33,9 +30,9 @@ fn is_power_of_two(v : Int) -> Bool {
 /// 已打开的数据库：保留原始字节，页面访问按需从 bytes 里切。
 pub struct Database {
   bytes : Bytes
-  page_size : Int
-  encoding : Int
-  version : Int
+  page_size : Int32
+  encoding : Int32
+  version : Int32
 }
 
 ///|
@@ -57,22 +54,22 @@ pub fn Database::open(bytes : Bytes) -> Database raise {
     raise DbError("unsupported text encoding \{encoding}")
   }
   let version = @format.be_i32(bytes, 96)
-  { bytes: bytes, page_size: page_size, encoding: encoding, version: version }
+  { bytes, page_size, encoding, version, }
 }
 
 ///|
-pub fn Database::page_size(self : Database) -> Int {
+pub fn Database::page_size(self : Database) -> Int32 {
   self.page_size
 }
 
 ///|
-pub fn Database::encoding(self : Database) -> Int {
+pub fn Database::encoding(self : Database) -> Int32 {
   self.encoding
 }
 
 ///|
 /// 文件头里记录的是写库时的库版本号（如 3053004）。
-pub fn Database::sqlite_version(self : Database) -> Int {
+pub fn Database::sqlite_version(self : Database) -> Int32 {
   self.version
 }
 

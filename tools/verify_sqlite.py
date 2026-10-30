@@ -18,15 +18,27 @@ The CLI contract under test (see cmd/main):
 Exit code is 0 only when every database matches; otherwise the first difference of each failing
 database is printed with its table, rowid and column.
 
+The CLI talks to the filesystem, so it must run on the **native** target:
+`moon build cmd/main --target native --release`.
+
+The script rebuilds that binary on every run (pass --no-rebuild to reuse one). A stale
+`_build/native/.../main.exe` silently answering with pre-fix results is exactly how a real fix looks
+like it did nothing, so the default is a fresh build.
+
 Usage:
-    python3 tools/verify_sqlite.py            # full run
-    python3 tools/verify_sqlite.py --keep     # keep the temporary directory
+    python3 tools/verify_sqlite.py                   # rebuild, then compare everything
+    python3 tools/verify_sqlite.py --no-rebuild      # trust the existing native binary
+    python3 tools/verify_sqlite.py --keep            # keep the temporary directory
     python3 tools/verify_sqlite.py --generate-only   # only build the databases
+    python3 tools/verify_sqlite.py --cli PATH        # use an existing CLI binary (no build)
+
+Set MOON_CLI to a binary path to skip the build as well.
 """
 
 from __future__ import annotations
 
 import json
+import os
 import pathlib
 import shutil
 import sqlite3
@@ -418,20 +430,27 @@ def normalize(value):
 # --------------------------------------------------------------------------------------
 
 
-def resolve_cli(repo):
+def resolve_cli(repo, explicit=None, rebuild=True):
+    """The CLI needs the native target (the reader uses moonbitlang/x fs)."""
+    if explicit:
+        return [explicit]
+    from_env = os.environ.get("MOON_CLI")
+    if from_env:
+        return [from_env]
     binary = repo / "_build" / "native" / "release" / "build" / "cmd" / "main" / "main.exe"
-    if binary.exists():
-        return [str(binary)]
-    print("[build] moon build --target native --release cmd/main", file=sys.stderr)
-    built = subprocess.run(
-        ["moon", "build", "--target", "native", "--release", "cmd/main"],
-        cwd=repo,
-        capture_output=True,
-        text=True,
-    )
-    if built.returncode != 0 or not binary.exists():
-        sys.stderr.write(built.stdout + built.stderr)
-        raise SystemExit("cannot build cmd/main")
+    if rebuild or not binary.exists():
+        print("[build] moon build cmd/main --target native --release", file=sys.stderr)
+        built = subprocess.run(
+            ["moon", "build", "cmd/main", "--target", "native", "--release"],
+            cwd=repo,
+            capture_output=True,
+            text=True,
+        )
+        if built.returncode != 0 or not binary.exists():
+            sys.stderr.write(built.stdout + built.stderr)
+            raise SystemExit("cannot build cmd/main --target native --release (see the build output)")
+    elif binary.exists():
+        print(f"[build] reusing {binary}", file=sys.stderr)
     return [str(binary)]
 
 
@@ -454,10 +473,12 @@ def cli_schema(cli, path):
         raise CliError(f"schema is not JSON: {exc}: {text[:200]}")
 
 
-def cli_dump(cli, path, table=None):
+def cli_dump(cli, path, table=None, limit=None):
     args = ["dump", str(path)]
     if table is not None:
         args += ["--table", table]
+    if limit is not None:
+        args += ["--limit", str(limit)]
     proc = run_cli(cli, args)
     if proc.returncode != 0:
         raise CliError(f"dump exited {proc.returncode}: {proc.stderr.strip()}")
@@ -621,6 +642,38 @@ def describe(value):
     return text if len(text) <= 120 else text[:117] + "..."
 
 
+def check_cli_options(cli, fixtures):
+    """`--table` and `--limit` are part of the CLI contract too."""
+    checks = 0
+    problems = []
+
+    multi = fixtures["13_multi_table"]
+    expected_multi = expected_rows(multi)
+    rows = cli_dump(cli, multi, table="orders")
+    tables = sorted({row.get("table") for row in rows})
+    if tables != ["orders"]:
+        problems.append(f"--table orders: expected only orders rows, got tables {tables}")
+    elif len(rows) != len(expected_multi["orders"][1]):
+        problems.append(
+            f"--table orders: expected {len(expected_multi['orders'][1])} rows, got {len(rows)}"
+        )
+    else:
+        checks += 1
+
+    many = fixtures["09_many_rows"]
+    rows = cli_dump(cli, many, limit=2)
+    expected = expected_rows(many)["t"][1][:2]
+    got = [(row.get("rowid"), row.get("values")) for row in rows]
+    want = [(rowid, values) for rowid, values in expected]
+    if len(rows) != 2:
+        problems.append(f"--limit 2 on a 5000 row table: expected 2 rows, got {len(rows)}")
+    elif got != want:
+        problems.append("--limit 2: the two rows differ from the first two rows of the table")
+    else:
+        checks += 1
+    return checks, problems
+
+
 # --------------------------------------------------------------------------------------
 # driver
 # --------------------------------------------------------------------------------------
@@ -629,6 +682,14 @@ def describe(value):
 def main(argv):
     keep = "--keep" in argv
     generate_only = "--generate-only" in argv
+    rebuild = "--no-rebuild" not in argv
+    cli_override = None
+    if "--cli" in argv:
+        index = argv.index("--cli")
+        if index + 1 < len(argv):
+            cli_override = argv[index + 1]
+        else:
+            raise SystemExit("--cli needs a path to the CLI binary")
     workdir = pathlib.Path(tempfile.mkdtemp(prefix="moon-lite-verify-"))
     stats = {
         "databases": 0,
@@ -658,7 +719,7 @@ def main(argv):
             )
             return 0
 
-        cli = resolve_cli(REPO)
+        cli = resolve_cli(REPO, cli_override, rebuild=rebuild and cli_override is None)
         print(f"[cli] {' '.join(cli)}")
         for fixture in FIXTURES:
             try:
@@ -684,6 +745,15 @@ def main(argv):
             except CliError as exc:
                 failures.append(f"{fixture.name}: {exc}")
                 print(f"[FAIL] {fixture.name}: {exc}")
+
+        fixtures = {fixture.name: fixture.path for fixture in FIXTURES}
+        option_checks, option_problems = check_cli_options(cli, fixtures)
+        stats["checks"] += option_checks
+        for problem in option_problems:
+            failures.append(f"cli options: {problem}")
+            print(f"[FAIL] cli options: {problem}")
+        if not option_problems:
+            print("[ok]   cli options: --table and --limit")
     finally:
         if keep:
             print(f"[keep] {workdir}")

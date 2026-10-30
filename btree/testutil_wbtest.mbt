@@ -106,12 +106,71 @@ fn expected_local(page_size : Int32, total : Int32) -> Int32 {
   } else {
     let m = (page_size - 12) * 32 / 255 - 23
     let k = m + (total - m) % (page_size - 4)
-    if total <= k {
-      total
+    if k <= x {
+      k
     } else {
       m
     }
   }
+}
+
+///|
+// 索引页的本地 payload 长度（X 用索引页公式，M/K 与表叶相同）。
+fn expected_local_index(page_size : Int32, total : Int32) -> Int32 {
+  let x = (page_size - 12) * 64 / 255 - 23
+  if total <= x {
+    total
+  } else {
+    let m = (page_size - 12) * 32 / 255 - 23
+    let k = m + (total - m) % (page_size - 4)
+    if k <= x {
+      k
+    } else {
+      m
+    }
+  }
+}
+
+///|
+// leaf index cell：varint payload 长度 + payload。
+fn index_leaf_cell(payload : Array[Byte]) -> Array[Byte] {
+  let out : Array[Byte] = []
+  push_varint(out, payload.length())
+  for x in payload {
+    out.push(x)
+  }
+  out
+}
+
+///|
+// 带溢出页的 leaf index cell。
+fn index_leaf_cell_overflow(
+  total : Int32,
+  local_bytes : Array[Byte],
+  next : Int32,
+) -> Array[Byte] {
+  let out : Array[Byte] = []
+  push_varint(out, total)
+  for x in local_bytes {
+    out.push(x)
+  }
+  push_u32(out, next)
+  out
+}
+
+///|
+// interior index cell：4 字节左孩子 + varint payload 长度 + payload。
+fn index_interior_cell(
+  left_child : Int32,
+  payload : Array[Byte],
+) -> Array[Byte] {
+  let out : Array[Byte] = []
+  push_u32(out, left_child)
+  push_varint(out, payload.length())
+  for x in payload {
+    out.push(x)
+  }
+  out
 }
 
 ///|

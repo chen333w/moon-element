@@ -2,10 +2,10 @@
 
 ///|
 /// sqlite_master 的列：type、name、tbl_name、rootpage、sql。
-const MASTER_COLUMNS : Int = 5
+const MASTER_COLUMNS : Int32 = 5
 
 ///|
-fn text_at(values : Array[@format.Value], index : Int) -> String {
+fn text_at(values : Array[@format.Value], index : Int32) -> String {
   if index < 0 || index >= values.length() {
     return ""
   }
@@ -16,7 +16,7 @@ fn text_at(values : Array[@format.Value], index : Int) -> String {
 }
 
 ///|
-fn int_at(values : Array[@format.Value], index : Int) -> Int {
+fn int_at(values : Array[@format.Value], index : Int32) -> Int32 {
   if index < 0 || index >= values.length() {
     return 0
   }
@@ -32,13 +32,18 @@ pub fn Database::tables(self : Database) -> Array[TableInfo] {
   let out : Array[TableInfo] = []
   for entry in @btree.scan_table(self.bytes(), self.page_size(), 1) {
     let (_, offset, size) = entry
-    let payload = @btree.read_payload(self.bytes(), self.page_size(), offset, size)
+    let payload = @btree.read_payload(
+      self.bytes(),
+      self.page_size(),
+      offset,
+      size,
+    )
     let values = @format.decode_record_with_encoding(
-      payload,
-      0,
-      MASTER_COLUMNS,
-      self.encoding(),
-    ).values
+        payload,
+        0,
+        MASTER_COLUMNS,
+        self.encoding(),
+      ).values
     if text_at(values, 0) == "table" {
       let name = text_at(values, 1)
       if !name.has_prefix("sqlite_") {
@@ -46,14 +51,12 @@ pub fn Database::tables(self : Database) -> Array[TableInfo] {
         let parsed = @schema.parse_columns(sql)
         let columns : Array[ColumnInfo] = []
         for column in parsed {
-          columns.push(
-            {
-              name: column.name,
-              declared_type: column.declared_type,
-              not_null: column.not_null,
-              primary_key: column.primary_key,
-            },
-          )
+          columns.push({
+            name: column.name,
+            declared_type: column.declared_type,
+            not_null: column.not_null,
+            primary_key: column.primary_key,
+          })
         }
         let without_rowid = @schema.has_without_rowid(sql)
         if without_rowid {
@@ -71,15 +74,13 @@ pub fn Database::tables(self : Database) -> Array[TableInfo] {
             index = index + 1
           }
         }
-        out.push(
-          {
-            name: name,
-            sql: sql,
-            root_page: int_at(values, 3),
-            columns: columns,
-            without_rowid: without_rowid,
-          },
-        )
+        out.push({
+          name,
+          sql,
+          root_page: int_at(values, 3),
+          columns,
+          without_rowid,
+        })
       }
     }
   }
@@ -104,29 +105,57 @@ pub fn Database::table(self : Database, name : String) -> TableInfo? {
 pub fn Database::rows(self : Database, table : String) -> Array[Row] raise {
   let info = match self.table(table) {
     Some(info) => info
-    None => {
-      raise DbError("no such table: \{table}")
-    }
+    None => raise DbError("no such table: \{table}")
   }
   let out : Array[Row] = []
   let ncols = info.columns.length()
-  let alias = rowid_alias_index(info.columns, info.without_rowid)
+  if info.without_rowid {
+    // WITHOUT ROWID 表的数据在索引 b-tree 里：没有 rowid，payload 按索引公式还原
+    for
+      entry in @btree.scan_index_leaves(
+        self.bytes(),
+        self.page_size(),
+        info.root_page,
+      ) {
+      let (offset, size) = entry
+      let payload = @btree.read_index_payload(
+        self.bytes(),
+        self.page_size(),
+        offset,
+        size,
+      )
+      let values = @format.decode_record_with_encoding(
+          payload,
+          0,
+          ncols,
+          self.encoding(),
+        ).values
+      out.push({ rowid: 0L, values: apply_affinity(values, info.columns), })
+    }
+    return out
+  }
+  let pk_alias = rowid_alias_index(info.columns, false)
   for entry in @btree.scan_table(self.bytes(), self.page_size(), info.root_page) {
     let (rowid, offset, size) = entry
-    let payload = @btree.read_payload(self.bytes(), self.page_size(), offset, size)
+    let payload = @btree.read_payload(
+      self.bytes(),
+      self.page_size(),
+      offset,
+      size,
+    )
     let values = @format.decode_record_with_encoding(
-      payload,
-      0,
-      ncols,
-      self.encoding(),
-    ).values
-    let values = if alias >= 0 && alias < values.length() {
-      values[alias] = @format.Value::Int(rowid)
+        payload,
+        0,
+        ncols,
+        self.encoding(),
+      ).values
+    let values = if pk_alias >= 0 && pk_alias < values.length() {
+      values[pk_alias] = @format.Value::Int(rowid)
       values
     } else {
       values
     }
-    out.push({ rowid: rowid, values: apply_affinity(values, info.columns) })
+    out.push({ rowid, values: apply_affinity(values, info.columns), })
   }
   out
 }
@@ -155,7 +184,10 @@ fn trim_ascii(s : String) -> String {
 ///|
 /// INTEGER PRIMARY KEY 是 rowid 别名：记录体里存 NULL，读回时要用 rowid 顶替。
 /// 返回该列的下标；没有别名时返回 -1。
-fn rowid_alias_index(columns : Array[ColumnInfo], without_rowid : Bool) -> Int {
+fn rowid_alias_index(
+  columns : Array[ColumnInfo],
+  without_rowid : Bool,
+) -> Int32 {
   if without_rowid {
     return -1
   }
@@ -239,7 +271,9 @@ fn char_at2(s : String, i : Int32) -> Char {
 /// REAL 亲和性：这类列里存成整数的值，SQLite 读回时会强制成浮点。
 fn has_real_affinity(declared_type : String) -> Bool {
   let t = lower_ascii(declared_type)
-  contains_ascii(t, "real") || contains_ascii(t, "floa") || contains_ascii(t, "doub")
+  contains_ascii(t, "real") ||
+  contains_ascii(t, "floa") ||
+  contains_ascii(t, "doub")
 }
 
 ///|

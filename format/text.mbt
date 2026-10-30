@@ -3,7 +3,7 @@
 
 ///|
 /// 把 [start, start+len) 夹到实际字节范围内，返回 (起点, 终点)。
-fn clamp_range(bytes : Bytes, start : Int, len : Int) -> (Int, Int) {
+fn clamp_range(bytes : Bytes, start : Int32, len : Int32) -> (Int32, Int32) {
   let total = bytes.length()
   let mut s = start
   if s < 0 {
@@ -22,7 +22,7 @@ fn clamp_range(bytes : Bytes, start : Int, len : Int) -> (Int, Int) {
 }
 
 ///|
-fn at_byte(bytes : Bytes, i : Int) -> Int32 {
+fn at_byte(bytes : Bytes, i : Int32) -> Int32 {
   bytes[i].to_int()
 }
 
@@ -38,7 +38,7 @@ fn push_code_point(out : Array[Char], cp : Int32) -> Unit {
 ///|
 /// UTF-8 解码。过长编码、孤立续字节、被截断的多字节序列都按 U+FFFD 处理，
 /// 每次至少前进 1 字节，保证循环收敛。
-fn decode_utf8_range(bytes : Bytes, start : Int, end : Int) -> String {
+fn decode_utf8_range(bytes : Bytes, start : Int32, end : Int32) -> String {
   let out : Array[Char] = []
   let mut i = start
   while i < end {
@@ -109,14 +109,14 @@ fn decode_utf8_range(bytes : Bytes, start : Int, end : Int) -> String {
 
 ///|
 /// 解码 UTF-8 字节区间；越界部分按实际长度截断。
-pub fn decode_utf8(bytes : Bytes, start : Int, len : Int) -> String {
+pub fn decode_utf8(bytes : Bytes, start : Int32, len : Int32) -> String {
   let range = clamp_range(bytes, start, len)
   decode_utf8_range(bytes, range.0, range.1)
 }
 
 ///|
 /// 读一个 UTF-16 code unit（调用方保证 i+1 < end）。
-fn utf16_unit(bytes : Bytes, i : Int, big_endian : Bool) -> Int32 {
+fn utf16_unit(bytes : Bytes, i : Int32, big_endian : Bool) -> Int32 {
   if big_endian {
     (at_byte(bytes, i) << 8) | at_byte(bytes, i + 1)
   } else {
@@ -127,7 +127,12 @@ fn utf16_unit(bytes : Bytes, i : Int, big_endian : Bool) -> Int32 {
 ///|
 /// UTF-16LE / UTF-16BE 解码，支持代理对。
 /// 孤立代理、以及末尾凑不满一个 code unit 的字节都按 U+FFFD 处理。
-pub fn decode_utf16(bytes : Bytes, start : Int, len : Int, big_endian : Bool) -> String {
+pub fn decode_utf16(
+  bytes : Bytes,
+  start : Int32,
+  len : Int32,
+  big_endian : Bool,
+) -> String {
   let range = clamp_range(bytes, start, len)
   let end = range.1
   let out : Array[Char] = []
@@ -165,7 +170,12 @@ pub fn decode_utf16(bytes : Bytes, start : Int, len : Int, big_endian : Bool) ->
 ///|
 /// 按数据库编码解文本：1=UTF-8（默认）、2=UTF-16LE、3=UTF-16BE。
 /// 未知编码按 UTF-8 处理。
-pub fn decode_text(bytes : Bytes, start : Int, len : Int, encoding : Int) -> String {
+pub fn decode_text(
+  bytes : Bytes,
+  start : Int32,
+  len : Int32,
+  encoding : Int32,
+) -> String {
   if encoding == 2 {
     decode_utf16(bytes, start, len, false)
   } else if encoding == 3 {

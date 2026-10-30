@@ -36,7 +36,7 @@ fn lower(s : String) -> String {
 }
 
 ///|
-fn slice_chars(chars : Array[Char], from : Int, to : Int) -> String {
+fn slice_chars(chars : Array[Char], from : Int32, to : Int32) -> String {
   let n = chars.length()
   let start = if from < 0 { 0 } else if from > n { n } else { from }
   let stop = if to > n { n } else if to < start { start } else { to }
@@ -51,8 +51,8 @@ fn slice_chars(chars : Array[Char], from : Int, to : Int) -> String {
 
 ///|
 fn contains_ci(haystack : String, needle : String) -> Bool {
-  let hay = (lower(haystack)).to_array()
-  let pat = (lower(needle)).to_array()
+  let hay = lower(haystack).to_array()
+  let pat = lower(needle).to_array()
   let hn = hay.length()
   let pn = pat.length()
   if pn == 0 {
@@ -155,7 +155,11 @@ fn join_type(tokens : Array[String]) -> String {
 
 ///|
 /// 在 [from, to) 里按顶层逗号切分（括号内的逗号不切）。
-fn split_top_level(chars : Array[Char], from : Int, to : Int) -> Array[String] {
+fn split_top_level(
+  chars : Array[Char],
+  from : Int32,
+  to : Int32,
+) -> Array[String] {
   let out : Array[String] = []
   let mut depth = 0
   let mut start = from
@@ -177,7 +181,11 @@ fn split_top_level(chars : Array[Char], from : Int, to : Int) -> Array[String] {
 }
 
 ///|
-fn token_texts(tokens : Array[String], from : Int, to : Int) -> Array[String] {
+fn token_texts(
+  tokens : Array[String],
+  from : Int32,
+  to : Int32,
+) -> Array[String] {
   let out : Array[String] = []
   let mut i = from
   while i < to {
@@ -189,7 +197,7 @@ fn token_texts(tokens : Array[String], from : Int, to : Int) -> Array[String] {
 
 ///|
 /// 最外层括号的位置：`(open, close)`。
-fn body_range(chars : Array[Char]) -> (Int, Int)? {
+fn body_range(chars : Array[Char]) -> (Int32, Int32)? {
   let n = chars.length()
   let mut open = -1
   let mut depth = 0
@@ -282,26 +290,23 @@ pub fn parse_columns(sql : String) -> Array[ParsedColumn] {
         let mut k = type_end
         while k < tokens.length() {
           let word = lower(tokens[k])
-          if word == "not" && k + 1 < tokens.length() && lower(tokens[k + 1]) == "null" {
+          if word == "not" &&
+            k + 1 < tokens.length() &&
+            lower(tokens[k + 1]) == "null" {
             not_null = true
             k = k + 2
             continue
           }
-          if word == "primary" && k + 1 < tokens.length() && lower(tokens[k + 1]) == "key" {
+          if word == "primary" &&
+            k + 1 < tokens.length() &&
+            lower(tokens[k + 1]) == "key" {
             primary_key = true
             k = k + 2
             continue
           }
           k = k + 1
         }
-        columns.push(
-          {
-            name: name,
-            declared_type: declared_type,
-            not_null: not_null,
-            primary_key: primary_key,
-          },
-        )
+        columns.push({ name, declared_type, not_null, primary_key, })
       }
       // 表级 PRIMARY KEY 命中的列补标记
       let mut index = 0

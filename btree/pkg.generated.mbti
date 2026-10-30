@@ -4,7 +4,11 @@ package "chen333w/moon-lite/btree"
 // Values
 pub fn page_type(Bytes, Int32, Int32) -> Int32
 
+pub fn read_index_payload(Bytes, Int32, Int32, Int32) -> Bytes
+
 pub fn read_payload(Bytes, Int32, Int32, Int32) -> Bytes
+
+pub fn scan_index_leaves(Bytes, Int32, Int32) -> Array[(Int32, Int32)]
 
 pub fn scan_table(Bytes, Int32, Int32) -> Array[(Int64, Int32, Int32)]
 
