@@ -372,6 +372,12 @@ fn quote_ident(name : String) -> String {
 ///|
 fn sql_lines(db : @db.Database, options : Options) -> Array[String] raise {
   let out : Array[String] = []
+  // 先输出建表语句，导出的 SQL 才能独立重建一个库（sqlite_ 开头的内部表跳过）。
+  for table in db.tables() {
+    if wanted(options, table) && table.sql.length() > 0 {
+      out.push(table.sql + ";")
+    }
+  }
   for table in db.tables() {
     if wanted(options, table) {
       let mut emitted : Int32 = 0
