@@ -37,3 +37,10 @@ jobs:
       # dumps them, and every row and value is compared.
       - name: Differential conformance against SQLite
         run: python3 tools/verify_sqlite.py
+
+      # Informational: the conformance suite above is the gate, coverage is a signal.
+      - name: Coverage (js, informational)
+        continue-on-error: true
+        run: |
+          moon test --target js --enable-coverage
+          moon coverage report -f summary
