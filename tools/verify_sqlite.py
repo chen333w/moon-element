@@ -330,6 +330,89 @@ def build_composite_pk(path):
     conn.close()
 
 
+def build_quoted_names(path):
+    """带空格的表名/列名 + 保留字，值里塞逗号、引号、换行、单引号。"""
+    conn = new_conn(path)
+    conn.execute('CREATE TABLE "my table" ("select" INTEGER, "order by" TEXT, "a b" BLOB)')
+    conn.executemany(
+        'INSERT INTO "my table" VALUES (?, ?, ?)',
+        [
+            (1, "plain", b"\x00\xff"),
+            (2, 'has, comma and "quote"', b""),
+            (3, "line\nbreak and \rcr", b"\x01"),
+            (4, "single ' quote", b"\x02"),
+        ],
+    )
+    conn.commit()
+    conn.close()
+
+
+def build_text_pk(path):
+    """普通 rowid 表，但主键是 TEXT 列。"""
+    conn = new_conn(path)
+    conn.execute("CREATE TABLE t (k TEXT PRIMARY KEY, v INTEGER)")
+    conn.executemany("INSERT INTO t VALUES (?, ?)", [("a", 1), ("b", 2), ("", 3)])
+    conn.commit()
+    conn.close()
+
+
+def build_blob_edges(path):
+    """空 blob、全零 blob，以及紧挨着的短 blob。"""
+    conn = new_conn(path)
+    conn.execute("CREATE TABLE t (id INTEGER PRIMARY KEY, empty BLOB, zeros BLOB, mix BLOB)")
+    conn.executemany(
+        "INSERT INTO t VALUES (?, ?, ?, ?)",
+        [
+            (1, b"", b"\x00\x00\x00", bytes(range(8))),
+            (2, b"", b"", b"\x00"),
+        ],
+    )
+    conn.commit()
+    conn.close()
+
+
+def build_table_shapes(path):
+    """单列表 + 20 列宽表。"""
+    conn = new_conn(path)
+    conn.executescript("CREATE TABLE single (v TEXT);")
+    conn.execute("INSERT INTO single VALUES (?)", ("only",))
+    columns = ", ".join(f"c{i:02d} INTEGER" for i in range(1, 21))
+    conn.executescript(f"CREATE TABLE wide ({columns});")
+    placeholders = ", ".join("?" * 20)
+    conn.execute(f"INSERT INTO wide VALUES ({placeholders})", tuple(range(1, 21)))
+    conn.commit()
+    conn.close()
+
+
+def build_unicode_names(path):
+    """表名/列名用中文和 emoji；文本值里也有 emoji。"""
+    conn = new_conn(path)
+    conn.execute('CREATE TABLE "用户😀" ("名字" TEXT, "值🚀" INTEGER)')
+    conn.executemany(
+        'INSERT INTO "用户😀" VALUES (?, ?)',
+        [("小明", 1), ("emoji 😀🚀", 2), ("", 3)],
+    )
+    conn.commit()
+    conn.close()
+
+
+def build_wal(path):
+    """WAL 模式的库：读取器必须明确拒绝，不能静默读旧快照。"""
+    conn = sqlite3.connect(str(path))
+    mode = conn.execute("PRAGMA journal_mode=WAL").fetchone()[0]
+    if str(mode).lower() != "wal":
+        raise AssertionError(f"fixture could not switch to WAL: {mode!r}")
+    conn.execute("CREATE TABLE t (a INTEGER, b TEXT)")
+    conn.executemany("INSERT INTO t VALUES (?, ?)", [(i, f"wal-{i}") for i in range(5)])
+    conn.commit()
+    conn.close()
+    header = pathlib.Path(path).read_bytes()
+    if header[18] != 2 or header[19] != 2:
+        raise AssertionError(
+            f"expected WAL version bytes 2/2 in the header, got {header[18]}/{header[19]}"
+        )
+
+
 FIXTURES = [
     Db("01_basic_types", build_basic_types),
     Db("02_integers", build_integers),
@@ -351,6 +434,12 @@ FIXTURES = [
     Db("18_page_512", build_page_512),
     Db("19_page_65536", build_page_65536),
     Db("20_composite_pk", build_composite_pk),
+    Db("21_quoted_names", build_quoted_names),
+    Db("22_text_pk", build_text_pk),
+    Db("23_blob_edges", build_blob_edges),
+    Db("24_table_shapes", build_table_shapes),
+    Db("25_unicode_names", build_unicode_names),
+    Db("26_wal", build_wal, expect_error="WAL"),
 ]
 
 
@@ -476,14 +565,22 @@ def resolve_cli(repo, explicit=None, rebuild=True):
 
 
 def run_cli(cli, args):
-    return subprocess.run(cli + args, capture_output=True, text=True)
+    # 不用 text=True：通用换行转换会把 CSV/SQL 字段里的 \r 变成 \n
+    return subprocess.run(cli + args, capture_output=True)
+
+
+def decode_stdout(proc):
+    return proc.stdout.decode("utf-8", errors="replace")
 
 
 def cli_schema(cli, path):
     proc = run_cli(cli, ["schema", str(path)])
     if proc.returncode != 0:
-        raise CliError(f"schema exited {proc.returncode}: {proc.stderr.strip()}")
-    text = proc.stdout.strip()
+        raise CliError(
+            f"schema exited {proc.returncode}: "
+            f"{proc.stderr.decode('utf-8', errors='replace').strip()}"
+        )
+    text = decode_stdout(proc).strip()
     if not text:
         raise CliError("schema printed nothing")
     if "\n" in text:
@@ -502,9 +599,12 @@ def cli_dump(cli, path, table=None, limit=None):
         args += ["--limit", str(limit)]
     proc = run_cli(cli, args)
     if proc.returncode != 0:
-        raise CliError(f"dump exited {proc.returncode}: {proc.stderr.strip()}")
+        raise CliError(
+            f"dump exited {proc.returncode}: "
+            f"{proc.stderr.decode('utf-8', errors='replace').strip()}"
+        )
     rows = []
-    for lineno, line in enumerate(proc.stdout.splitlines(), 1):
+    for lineno, line in enumerate(decode_stdout(proc).splitlines(), 1):
         if not line.strip():
             continue
         try:
@@ -696,6 +796,209 @@ def check_cli_options(cli, fixtures):
 
 
 # --------------------------------------------------------------------------------------
+# csv / sql / stats output, and the expected WAL rejection
+# --------------------------------------------------------------------------------------
+
+
+def cli_text(cli, args, what):
+    proc = subprocess.run(cli + args, capture_output=True)
+    if proc.returncode != 0:
+        raise CliError(
+            f"{what} exited {proc.returncode}: "
+            f"{proc.stderr.decode('utf-8', errors='replace').strip()}"
+        )
+    return decode_stdout(proc)
+
+
+def cli_csv(cli, path, table=None):
+    args = ["dump", str(path), "--format", "csv"]
+    if table is not None:
+        args += ["--table", table]
+    text = cli_text(cli, args, "dump --format csv")
+    # newline="" 让 csv 模块自己处理 \r（RFC 4180 的行结束符）
+    return list(csv.reader(io.StringIO(text, newline="")))
+
+
+def compare_csv_cell(want, cell):
+    kind = want["type"]
+    if kind == "null":
+        return None if cell == "" else f"expected an empty field for NULL, got {cell!r}"
+    if kind == "integer":
+        return None if cell == str(want["value"]) else f"expected {want['value']} got {cell!r}"
+    if kind == "real":
+        try:
+            number = float(cell)
+        except ValueError:
+            return f"real field is not a number: {cell!r}"
+        return None if number == want["value"] else f"expected {want['value']!r} got {number!r}"
+    if kind == "text":
+        return None if cell == want["value"] else f"expected {want['value']!r} got {cell!r}"
+    if kind == "blob":
+        if cell.lower() != want["value"]:
+            return f"expected hex {want['value'][:32]} got {cell[:32]!r}"
+        return None
+    return f"unexpected type {kind}"
+
+
+def check_csv(cli, db_name, path, schema, rows):
+    """Per table: a header row of column names, then the rows as RFC 4180 CSV."""
+    checks = 0
+    for table in schema["tables"]:
+        name = table["name"]
+        expected = rows.get(name)
+        if expected is None:
+            raise Diff(f"{db_name}.{name}: csv: table missing from the dump")
+        _, table_rows = expected
+        records = cli_csv(cli, path, table=name)
+        if not records:
+            raise Diff(f"{db_name}.{name}: csv: no output")
+        want_header = [column["name"] for column in table["columns"]]
+        if records[0] != want_header:
+            raise Diff(f"{db_name}.{name}: csv header expected {want_header} got {records[0]}")
+        body = records[1:]
+        if len(body) != len(table_rows):
+            raise Diff(
+                f"{db_name}.{name}: csv expected {len(table_rows)} rows, got {len(body)}"
+            )
+        for index, (rowid, values) in enumerate(table_rows):
+            cells = body[index]
+            # 只有一列且该列为空时，输出就是一行空行；csv 模块把空行读成 0 个字段
+            if len(cells) == 0 and len(values) == 1:
+                cells = [""]
+            if len(cells) != len(values):
+                raise Diff(
+                    f"{db_name}.{name} rowid={rowid}: csv expected {len(values)} fields, "
+                    f"got {len(cells)}"
+                )
+            for column, (want, cell) in enumerate(zip(values, cells)):
+                problem = compare_csv_cell(want, cell)
+                if problem is not None:
+                    raise Diff(f"{db_name}.{name} rowid={rowid} column {column}: csv {problem}")
+        checks += 1
+    return checks
+
+
+def check_sql(cli, db_name, path, workdir):
+    """Execute the exported SQL in a fresh database, then compare rowid and every value."""
+    text = cli_text(cli, ["dump", str(path), "--format", "sql"], "dump --format sql")
+    if not text.strip():
+        raise Diff(f"{db_name}: sql: the export is empty")
+    rebuilt = pathlib.Path(workdir) / f"rebuilt-{db_name}.db"
+    if rebuilt.exists():
+        rebuilt.unlink()
+    conn = sqlite3.connect(str(rebuilt))
+    try:
+        conn.executescript(text)
+        conn.commit()
+    finally:
+        conn.close()
+    want = expected_rows(path)
+    got = expected_rows(rebuilt)
+    for table in sorted(want):
+        if table not in got:
+            raise Diff(f"{db_name}: sql: table {table!r} did not survive the round trip")
+        want_without, want_rows = want[table]
+        got_without, got_rows = got[table]
+        if want_without != got_without:
+            raise Diff(f"{db_name}.{table}: sql: the WITHOUT ROWID flag changed")
+        if len(want_rows) != len(got_rows):
+            raise Diff(
+                f"{db_name}.{table}: sql: expected {len(want_rows)} rows after replay, "
+                f"got {len(got_rows)}"
+            )
+        for index, (want_row, got_row) in enumerate(zip(want_rows, got_rows)):
+            want_rowid, want_values = want_row
+            _, got_values = got_row
+            # 导出的 INSERT 形如 INSERT INTO "t" VALUES (...)，不带 rowid 列：
+            # 重建库会重新编号 rowid，所以这里只比对每一行的值。
+            if len(want_values) != len(got_values):
+                raise Diff(
+                    f"{db_name}.{table}: sql: row #{index} expected {len(want_values)} values, "
+                    f"got {len(got_values)}"
+                )
+            for column, (one, other) in enumerate(zip(want_values, got_values)):
+                problem = compare_value(one, other)
+                if problem is not None:
+                    raise Diff(
+                        f"{db_name}.{table} rowid={want_rowid} column {column}: sql {problem}"
+                    )
+    return 1
+
+
+def check_stats(cli, db_name, path):
+    text = cli_text(cli, ["stats", str(path)], "stats").strip()
+    if "\n" in text:
+        raise Diff(f"{db_name}: stats must print one JSON line")
+    data = json.loads(text)
+    size = pathlib.Path(path).stat().st_size
+    conn = sqlite3.connect(f"file:{path}?mode=ro", uri=True)
+    try:
+        page_size = conn.execute("PRAGMA page_size").fetchone()[0]
+        page_count = conn.execute("PRAGMA page_count").fetchone()[0]
+        encoding = conn.execute("PRAGMA encoding").fetchone()[0]
+        tables = conn.execute(
+            "SELECT name, sql FROM sqlite_master WHERE type = 'table' "
+            "AND name NOT LIKE 'sqlite\\_%' ESCAPE '\\'"
+        ).fetchall()
+        counts = {
+            name: conn.execute(f"SELECT count(*) FROM {quote_ident(name)}").fetchone()[0]
+            for name, _ in tables
+        }
+    finally:
+        conn.close()
+
+    checks = 0
+    for field, want in (
+        ("file_bytes", size),
+        ("page_size", page_size),
+        ("page_count", page_count),
+        ("encoding", encoding),
+        ("sqlite_version", version_number(sqlite3.sqlite_version)),
+    ):
+        if data.get(field) != want:
+            raise Diff(f"{db_name}: stats {field} expected {want!r} got {data.get(field)!r}")
+        checks += 1
+    if page_size and size // page_size != data.get("page_count"):
+        raise Diff(
+            f"{db_name}: stats page_count must be file bytes / page size "
+            f"({size // page_size}), got {data.get('page_count')}"
+        )
+
+    reported = {entry.get("name"): entry for entry in data.get("tables", [])}
+    if set(reported) != set(counts):
+        raise Diff(f"{db_name}: stats tables expected {sorted(counts)} got {sorted(reported)}")
+    checks += 1
+    for name, sql in sorted(tables, key=lambda item: item[0]):
+        entry = reported[name]
+        if entry.get("rows") != counts[name]:
+            raise Diff(
+                f"{db_name}.{name}: stats rows expected {counts[name]} got {entry.get('rows')}"
+            )
+        expected_without = "WITHOUT ROWID" in (sql or "").upper()
+        if bool(entry.get("without_rowid")) != expected_without:
+            raise Diff(
+                f"{db_name}.{name}: stats without_rowid expected {expected_without} "
+                f"got {entry.get('without_rowid')}"
+            )
+        checks += 1
+    return checks
+
+
+def check_expected_error(cli, fixture):
+    """A WAL database must be refused loudly, never read from a stale snapshot."""
+    proc = subprocess.run(cli + ["schema", str(fixture.path)], capture_output=True, text=True)
+    if proc.returncode == 0:
+        raise Diff(f"{fixture.name}: expected a non-zero exit, but the CLI read the database")
+    message = (proc.stderr + proc.stdout).lower()
+    if fixture.expect_error.lower() not in message:
+        raise Diff(
+            f"{fixture.name}: expected {fixture.expect_error!r} in the error output, "
+            f"got {proc.stderr.strip()[:200]!r}"
+        )
+    return 1
+
+
+# --------------------------------------------------------------------------------------
 # driver
 # --------------------------------------------------------------------------------------
 
@@ -718,6 +1021,10 @@ def main(argv):
         "rows": 0,
         "values": 0,
         "checks": 0,
+        "csv_checks": 0,
+        "sql_checks": 0,
+        "stats_checks": 0,
+        "error_checks": 0,
     }
     failures = []
     cli = None
@@ -729,6 +1036,8 @@ def main(argv):
         print(f"[fixtures] {stats['databases']} databases in {workdir}")
         if generate_only:
             for fixture in FIXTURES:
+                if fixture.expect_error is not None:
+                    continue
                 schema = expected_schema(fixture.path)
                 rows = expected_rows(fixture.path)
                 stats["tables"] += len(schema["tables"])
@@ -743,6 +1052,8 @@ def main(argv):
         cli = resolve_cli(REPO, cli_override, rebuild=rebuild and cli_override is None)
         print(f"[cli] {' '.join(cli)}")
         for fixture in FIXTURES:
+            if fixture.expect_error is not None:
+                continue
             try:
                 want_schema = expected_schema(fixture.path)
                 want_rows = expected_rows(fixture.path)
@@ -775,6 +1086,44 @@ def main(argv):
             print(f"[FAIL] cli options: {problem}")
         if not option_problems:
             print("[ok]   cli options: --table and --limit")
+
+        # 第二阶段：输出格式（csv/sql）、导出可重放性（sql）、stats 汇总，以及 WAL 拒绝
+        for fixture in FIXTURES:
+            if fixture.expect_error is not None:
+                continue
+            want_schema = expected_schema(fixture.path)
+            want_rows = expected_rows(fixture.path)
+            phase_failures = 0
+            for label, counter_key, runner in (
+                (
+                    "csv",
+                    "csv_checks",
+                    lambda: check_csv(cli, fixture.name, fixture.path, want_schema, want_rows),
+                ),
+                ("sql", "sql_checks", lambda: check_sql(cli, fixture.name, fixture.path, workdir)),
+                ("stats", "stats_checks", lambda: check_stats(cli, fixture.name, fixture.path)),
+            ):
+                try:
+                    produced = runner()
+                    stats[counter_key] += produced
+                    stats["checks"] += produced
+                except (Diff, CliError) as exc:
+                    phase_failures += 1
+                    failures.append(str(exc))
+                    print(f"[FAIL] {exc}")
+            if phase_failures == 0:
+                print(f"[ok]   {fixture.name}: csv, sql replay and stats")
+
+        for fixture in FIXTURES:
+            if fixture.expect_error is None:
+                continue
+            try:
+                stats["error_checks"] += check_expected_error(cli, fixture)
+                stats["checks"] += 1
+                print(f"[ok]   {fixture.name}: rejected explicitly ({fixture.expect_error})")
+            except (Diff, CliError) as exc:
+                failures.append(str(exc))
+                print(f"[FAIL] {exc}")
     finally:
         if keep:
             print(f"[keep] {workdir}")
@@ -785,6 +1134,10 @@ def main(argv):
     print()
     print(
         "databases: {databases}, tables: {tables}, rows: {rows}, values: {values}".format(**stats)
+    )
+    print(
+        "formats: csv {csv_checks} tables, sql {sql_checks} replays, stats {stats_checks} checks, "
+        "errors {error_checks}".format(**stats)
     )
     print(f"passed {stats['checks']}, failed {len(failures)}")
     if failures:
