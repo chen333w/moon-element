@@ -421,6 +421,8 @@ def build_freelist(path):
         "INSERT INTO t VALUES (?, ?)", [(i, f"row-{i}-" + "x" * 60) for i in range(120)]
     )
     conn.commit()
+    conn.execute("PRAGMA user_version = 7")
+    conn.execute("PRAGMA application_id = 305419896")
     conn.execute("DELETE FROM t WHERE id > 20")
     conn.commit()
     free = conn.execute("PRAGMA freelist_count").fetchone()[0]
@@ -1026,12 +1028,23 @@ def check_stats(cli, db_name, path):
         conn.close()
 
     checks = 0
+    header = pathlib.Path(path).read_bytes()[:100]
+    header_pages = int.from_bytes(header[28:32], "big", signed=True)
+    freelist_pages = int.from_bytes(header[36:40], "big", signed=True)
+    header_user_version = int.from_bytes(header[60:64], "big", signed=True)
+    header_application_id = int.from_bytes(header[68:72], "big", signed=True)
+    header_autovacuum_root = int.from_bytes(header[52:56], "big", signed=True)
     for field, want in (
         ("file_bytes", size),
         ("page_size", page_size),
         ("page_count", page_count),
         ("encoding", encoding),
         ("sqlite_version", version_number(sqlite3.sqlite_version)),
+        ("header_pages", header_pages),
+        ("freelist_pages", freelist_pages),
+        ("user_version", header_user_version),
+        ("application_id", header_application_id),
+        ("auto_vacuum", 0 if header_autovacuum_root == 0 else 1),
     ):
         if data.get(field) != want:
             raise Diff(f"{db_name}: stats {field} expected {want!r} got {data.get(field)!r}")

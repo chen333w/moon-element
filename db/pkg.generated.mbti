@@ -30,10 +30,19 @@ pub struct Database {
   page_size : Int32
   encoding : Int32
   version : Int32
+  database_pages : Int32
+  freelist_pages : Int32
+  user_version : Int32
+  application_id : Int32
+  auto_vacuum : Int32
 }
+pub fn Database::application_id(Self) -> Int32
+pub fn Database::auto_vacuum(Self) -> Int32
 pub fn Database::bytes(Self) -> Bytes
+pub fn Database::database_pages(Self) -> Int32
 pub fn Database::encoding(Self) -> Int32
 pub fn Database::encoding_label(Self) -> String
+pub fn Database::freelist_pages(Self) -> Int32
 pub fn Database::open(Bytes) -> Self raise
 pub fn Database::page_size(Self) -> Int32
 pub fn Database::rows(Self, String) -> Array[Row] raise
@@ -41,6 +50,7 @@ pub fn Database::schema_sql(Self) -> String
 pub fn Database::sqlite_version(Self) -> Int32
 pub fn Database::table(Self, String) -> TableInfo?
 pub fn Database::tables(Self) -> Array[TableInfo]
+pub fn Database::user_version(Self) -> Int32
 
 pub(all) struct Row {
   rowid : Int64

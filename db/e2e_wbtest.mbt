@@ -54,6 +54,12 @@ test "opening a real database file yields its tables, columns and rows" {
   let db = Database::open(hex_to_bytes(SAMPLE_HEX)) catch { _ => panic() }
   assert_eq(db.page_size(), 512)
   assert_eq(db.encoding(), 1)
+  // 头里的体检字段：2 页、无空闲页、默认 user_version / application_id / auto_vacuum
+  assert_eq(db.database_pages(), 2)
+  assert_eq(db.freelist_pages(), 0)
+  assert_eq(db.user_version(), 0)
+  assert_eq(db.application_id(), 0)
+  assert_eq(db.auto_vacuum(), 0)
   let tables = db.tables()
   assert_eq(tables.length(), 1)
   let table = tables[0]

@@ -408,6 +408,11 @@ fn stats_json(db : @db.Database, file_bytes : Int32) -> String {
   acc = acc + ",\"page_count\":" + pages.to_string()
   acc = acc + ",\"encoding\":\"" + db.encoding_label() + "\""
   acc = acc + ",\"sqlite_version\":" + db.sqlite_version().to_string()
+  acc = acc + ",\"header_pages\":" + db.database_pages().to_string()
+  acc = acc + ",\"freelist_pages\":" + db.freelist_pages().to_string()
+  acc = acc + ",\"user_version\":" + db.user_version().to_string()
+  acc = acc + ",\"application_id\":" + db.application_id().to_string()
+  acc = acc + ",\"auto_vacuum\":" + db.auto_vacuum().to_string()
   acc = acc + ",\"tables\":["
   let mut first_table = true
   for table in db.tables() {

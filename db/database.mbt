@@ -33,6 +33,11 @@ pub struct Database {
   page_size : Int32
   encoding : Int32
   version : Int32
+  database_pages : Int32
+  freelist_pages : Int32
+  user_version : Int32
+  application_id : Int32
+  auto_vacuum : Int32
 }
 
 ///|
@@ -63,7 +68,23 @@ pub fn Database::open(bytes : Bytes) -> Database raise {
     raise DbError("unsupported text encoding \{encoding}")
   }
   let version = @format.be_i32(bytes, 96)
-  { bytes, page_size, encoding, version, }
+  // 头里还有几个能当"体检"用的字段：页数、空闲页数、user_version、application_id、auto_vacuum。
+  let database_pages = @format.be_i32(bytes, 28)
+  let freelist_pages = @format.be_i32(bytes, 36)
+  let user_version = @format.be_i32(bytes, 60)
+  let application_id = @format.be_i32(bytes, 68)
+  let auto_vacuum = @format.be_i32(bytes, 52)
+  {
+    bytes,
+    page_size,
+    encoding,
+    version,
+    database_pages,
+    freelist_pages,
+    user_version,
+    application_id,
+    auto_vacuum,
+  }
 }
 
 ///|
@@ -110,4 +131,37 @@ pub fn Database::schema_sql(self : Database) -> String {
     out.push('\n')
   }
   String::from_iter(out.iter())
+}
+
+///|
+/// 文件头里记录的数据库页数（不是文件长度除以页大小，文件尾部可能有未回收的空间）。
+pub fn Database::database_pages(self : Database) -> Int32 {
+  self.database_pages
+}
+
+///|
+/// 空闲页数量：删除大量行但没 VACUUM 时会大于 0。
+pub fn Database::freelist_pages(self : Database) -> Int32 {
+  self.freelist_pages
+}
+
+///|
+/// 应用自定义的 user_version（`PRAGMA user_version`）。
+pub fn Database::user_version(self : Database) -> Int32 {
+  self.user_version
+}
+
+///|
+/// 应用 id（`PRAGMA application_id`），0 表示未设置。
+pub fn Database::application_id(self : Database) -> Int32 {
+  self.application_id
+}
+
+///|
+/// auto_vacuum 模式：0 = none、1 = full、2 = incremental（头里是最大根页号，0 表示关闭）。
+pub fn Database::auto_vacuum(self : Database) -> Int32 {
+  match self.auto_vacuum {
+    0 => 0
+    _ => 1
+  }
 }

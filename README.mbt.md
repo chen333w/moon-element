@@ -50,10 +50,10 @@ python3 tools/verify_sqlite.py
 31 databases, 33 tables, 9470 rows and 23986 values; every row, every value, plus the CSV export
 (parsed back field by field), the SQL export (replayed into an empty database and compared again)
 and the `stats` output (checked against `PRAGMA page_count`, `page_size`, `encoding` and
-`SELECT count(*)`). 9935 checks, 0 failures.
+`SELECT count(*)`, plus the header fields against `PRAGMA page_count`, `freelist_count`, `user_version`, `application_id` and `auto_vacuum`). 10085 checks, 0 failures.
 
 Unit tests cover 65 cases on wasm, wasm-gc and js and 70 on native, including an embedded
-`page_size=512` database that exercises open-and-read on every backend. Library coverage is 86.8%
+`page_size=512` database that exercises open-and-read on every backend. Library coverage is 86.9%
 against the js target.
 
 ## Commands
@@ -65,7 +65,7 @@ moon run cmd/main --target native -- schema example.db     # page size, encoding
 moon run cmd/main --target native -- dump example.db       # one JSON line per row
 moon run cmd/main --target native -- dump example.db --format csv   # RFC 4180
 moon run cmd/main --target native -- dump example.db --format sql   # INSERT statements
-moon run cmd/main --target native -- stats example.db      # file size, page count, rows per table
+moon run cmd/main --target native -- stats example.db      # pages, free pages, user_version, rows per table
 ```
 
 ## Layout
