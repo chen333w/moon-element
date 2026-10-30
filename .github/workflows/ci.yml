@@ -30,6 +30,12 @@ jobs:
       - name: Check all backends
         run: moon check --target all --deny-warn
 
+      # A changed public interface must be committed together with its .mbti file.
+      - name: Public interfaces are up to date
+        run: |
+          moon info
+          git diff --exit-code -- '*.mbti'
+
       - name: Test all backends
         run: moon test --target all --deny-warn
 

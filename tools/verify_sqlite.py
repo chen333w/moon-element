@@ -412,6 +412,79 @@ def build_wal(path):
             f"expected WAL version bytes 2/2 in the header, got {header[18]}/{header[19]}"
         )
 
+def build_freelist(path):
+    """删掉大多数行但不 VACUUM：空闲页留在 freelist 里，读取器只能走活动页。"""
+    conn = new_conn(path)
+    conn.execute("PRAGMA page_size=512")
+    conn.execute("CREATE TABLE t (id INTEGER PRIMARY KEY, body TEXT)")
+    conn.executemany(
+        "INSERT INTO t VALUES (?, ?)", [(i, f"row-{i}-" + "x" * 60) for i in range(120)]
+    )
+    conn.commit()
+    conn.execute("DELETE FROM t WHERE id > 20")
+    conn.commit()
+    free = conn.execute("PRAGMA freelist_count").fetchone()[0]
+    conn.close()
+    if free <= 0:
+        raise AssertionError(f"fixture should leave free pages behind, got {free}")
+
+
+def build_vacuumed(path):
+    """同样删行后 VACUUM：页面被重排，空闲页回收，行仍然可读。"""
+    conn = new_conn(path)
+    conn.execute("PRAGMA page_size=512")
+    conn.execute("CREATE TABLE t (id INTEGER PRIMARY KEY, body TEXT)")
+    conn.executemany(
+        "INSERT INTO t VALUES (?, ?)", [(i, f"row-{i}-" + "y" * 60) for i in range(120)]
+    )
+    conn.commit()
+    conn.execute("DELETE FROM t WHERE id > 20")
+    conn.commit()
+    conn.execute("VACUUM")
+    conn.commit()
+    free = conn.execute("PRAGMA freelist_count").fetchone()[0]
+    conn.close()
+    if free != 0:
+        raise AssertionError(f"VACUUM should leave no free pages, got {free}")
+
+
+def build_multi_overflow(path):
+    """一个 blob 跨多级溢出链（page_size=512 时需要几十页）。"""
+    conn = new_conn(path)
+    conn.execute("PRAGMA page_size=512")
+    conn.execute("CREATE TABLE t (id INTEGER PRIMARY KEY, body BLOB, tail TEXT)")
+    conn.execute("INSERT INTO t VALUES (1, ?, 'head')", (bytes(range(256)) * 80,))  # 20480
+    conn.execute("INSERT INTO t VALUES (2, ?, 'mid')", (bytes(range(256)) * 3,))  # 768
+    conn.execute("INSERT INTO t VALUES (3, ?, 'end')", (bytes(range(256)) * 200,))  # 51200
+    conn.commit()
+    conn.close()
+
+
+def build_multi_level_tree(path):
+    """page_size=512 + 4000 行：表 b-tree 至少三层，interior 页里还有 interior 页。"""
+    conn = new_conn(path)
+    conn.execute("PRAGMA page_size=512")
+    conn.execute("CREATE TABLE t (id INTEGER PRIMARY KEY, body TEXT)")
+    conn.executemany(
+        "INSERT INTO t VALUES (?, ?)", [(i, f"row-{i:05d}-" + "z" * 40) for i in range(4000)]
+    )
+    conn.commit()
+    conn.close()
+
+
+def build_deleted_rows(path):
+    """隔行删除：页里留下 freeblock，cell pointer 数组只含活动 cell。"""
+    conn = new_conn(path)
+    conn.execute("PRAGMA page_size=512")
+    conn.execute("CREATE TABLE t (id INTEGER PRIMARY KEY, body TEXT)")
+    conn.executemany(
+        "INSERT INTO t VALUES (?, ?)", [(i, f"row-{i}-" + "q" * 30) for i in range(200)]
+    )
+    conn.commit()
+    conn.execute("DELETE FROM t WHERE id % 2 = 0")
+    conn.commit()
+    conn.close()
+
 
 FIXTURES = [
     Db("01_basic_types", build_basic_types),
@@ -440,6 +513,11 @@ FIXTURES = [
     Db("24_table_shapes", build_table_shapes),
     Db("25_unicode_names", build_unicode_names),
     Db("26_wal", build_wal, expect_error="WAL"),
+    Db("27_freelist", build_freelist),
+    Db("28_vacuumed", build_vacuumed),
+    Db("29_multi_overflow", build_multi_overflow),
+    Db("30_multi_level_tree", build_multi_level_tree),
+    Db("31_deleted_rows", build_deleted_rows),
 ]
 
 
