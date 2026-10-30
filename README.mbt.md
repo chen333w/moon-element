@@ -33,7 +33,9 @@ for table in db.tables() {
 
 - no query engine: there is no SQL, only full-table scans in rowid order
 - no writing: the file is only read
-- no WAL or rollback-journal recovery, no incremental blob I/O, no encryption
+- no WAL or rollback-journal recovery: a WAL-mode database is rejected with a clear error instead
+  of silently returning the stale snapshot in the main file
+- no incremental blob I/O and no encryption
 - indexes are not traversed; `WITHOUT ROWID` tables read their storage b-tree directly
 
 ## Conformance
@@ -52,6 +54,9 @@ moon check --deny-warn --target all
 moon test --target all --deny-warn
 moon run cmd/main --target native -- schema example.db     # page size, encoding, tables and columns
 moon run cmd/main --target native -- dump example.db       # one JSON line per row
+moon run cmd/main --target native -- dump example.db --format csv   # RFC 4180
+moon run cmd/main --target native -- dump example.db --format sql   # INSERT statements
+moon run cmd/main --target native -- stats example.db      # file size, page count, rows per table
 ```
 
 ## Layout

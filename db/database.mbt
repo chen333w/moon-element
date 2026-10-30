@@ -44,6 +44,15 @@ pub fn Database::open(bytes : Bytes) -> Database raise {
   if !has_magic(bytes) {
     raise DbError("not a SQLite 3 database (bad header magic)")
   }
+  // 文件头第 18/19 字节是写/读格式版本：1 = 回滚日志，2 = WAL。
+  // WAL 库的最新数据在 -wal 文件里，只读主文件会读到旧快照，所以明确拒绝而不是静默返回旧数据。
+  let write_version = bytes[18].to_int()
+  let read_version = bytes[19].to_int()
+  if write_version == 2 || read_version == 2 {
+    raise DbError(
+      "database is in WAL mode: uncommitted frames live in the -wal file, so reading only the main file would return a stale snapshot; checkpoint it first",
+    )
+  }
   let raw = @format.be_u16(bytes, 16)
   let page_size = if raw == 1 { 65536 } else { raw }
   if page_size < 512 || page_size > 65536 || !is_power_of_two(page_size) {

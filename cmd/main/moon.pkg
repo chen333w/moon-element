@@ -1,5 +1,6 @@
 import {
   "chen333w/moon-lite/db",
+  "chen333w/moon-lite/format",
   "moonbitlang/core/env",
   "moonbitlang/x/fs",
   "moonbitlang/x/sys",
